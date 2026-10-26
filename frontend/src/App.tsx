@@ -1,27 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import AdminPanel from './AdminPanel'
 import { fetchSpaces } from './api'
-import type { Space, SpaceType } from './types'
+import type { AdminSlot, Space, SpaceType } from './types'
 
 const typeColors: Record<SpaceType, string> = {
   Sala: 'room-classroom',
   Laboratorio: 'room-lab',
-  Baño: 'room-bathroom',
-  Servicio: 'room-service',
+  Administrativo: 'room-service',
+  'Baño hombre': 'room-bathroom',
+  'Baño mujer': 'room-bathroom',
 }
 
 const defaultView = { rotation: -25, tilt: 55, zoom: 90 }
 const flatView = { rotation: 0, tilt: 0, zoom: 90 }
-
-const floorSlots = [
-  ...Array.from({ length: 12 }, (_, index) => ({
-    x: index % 6,
-    y: Math.floor(index / 6),
-  })),
-  ...Array.from({ length: 8 }, (_, index) => ({
-    x: 4 + (index % 2),
-    y: 2 + Math.floor(index / 2),
-  })),
-]
 
 function App() {
   const [spaces, setSpaces] = useState<Space[]>([])
@@ -33,6 +24,8 @@ function App() {
   const [accessibleOnly, setAccessibleOnly] = useState(false)
   const [floor, setFloor] = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [adminOpen, setAdminOpen] = useState(false)
+  const [adminSlots, setAdminSlots] = useState<AdminSlot[] | null>(null)
   const [rotation, setRotation] = useState(defaultView.rotation)
   const [tilt, setTilt] = useState(defaultView.tilt)
   const [zoom, setZoom] = useState(defaultView.zoom)
@@ -80,8 +73,13 @@ function App() {
   }, [accessibleOnly, floor, query, spaces, typeFilter])
 
   const selectedSpace = spaces.find((space) => space.id === selectedId)
-  const floorSpaces = spaces.filter((space) => space.floor === floor)
+  const adminMapActive = adminOpen && adminSlots !== null
+  const mapSpaces = adminMapActive ? adminSlots : spaces
+  const floorSpaces = mapSpaces.filter((space) => space.floor === floor)
   const filteredSpaceIds = new Set(filteredSpaces.map((space) => space.id))
+  const updateAdminSlots = useCallback((slots: AdminSlot[] | null) => {
+    setAdminSlots(slots)
+  }, [])
 
   function selectSpace(space: Space) {
     setSelectedId(space.id)
@@ -111,7 +109,20 @@ function App() {
           <span className="brand-mark" aria-hidden="true">C</span>
           <span>campus<span className="brand-light">explorer</span></span>
         </a>
-        <div className="demo-badge"><span /> Demo ficticia</div>
+        <div className="topbar-actions">
+          <div className="demo-badge"><span /> Demo ficticia</div>
+          <button
+            type="button"
+            className={`admin-entry${adminOpen ? ' is-active' : ''}`}
+            onClick={() => {
+              setAdminOpen((open) => !open)
+              if (adminOpen) setAdminSlots(null)
+            }}
+            aria-expanded={adminOpen}
+          >
+            {adminOpen ? 'Cerrar administración' : 'Administrar'}
+          </button>
+        </div>
       </header>
 
       <main id="inicio" className="page-content">
@@ -147,8 +158,9 @@ function App() {
               <option>Todos</option>
               <option>Sala</option>
               <option>Laboratorio</option>
-              <option>Baño</option>
-              <option>Servicio</option>
+              <option>Administrativo</option>
+              <option>Baño hombre</option>
+              <option>Baño mujer</option>
             </select>
           </label>
           <label className="accessibility-filter">
@@ -209,49 +221,37 @@ function App() {
                   aria-label="Plano esquemático de un edificio con forma de L"
                 >
                   <path d="M3 3 H597 V597 H403 V203 H3 Z" />
-                </svg>
-                {floorSlots.map((slot) => {
-                  const hasSpace = floorSpaces.some(
-                    (space) => space.x === slot.x && space.y === slot.y,
-                  )
+                </svg                >
+                  {floorSpaces.map((space) => {
+                    const matchesFilters = filteredSpaceIds.has(space.id)
+                    const hiddenInAdmin = adminMapActive && 'enabled' in space && !space.enabled
+                    const displayName = space.name || (adminMapActive ? space.id : '')
 
-                  return hasSpace ? null : (
-                    <div
-                      key={`empty-${slot.x}-${slot.y}`}
-                      className="map-space-placeholder"
-                      style={{ gridColumn: slot.x + 1, gridRow: slot.y + 1 }}
-                      aria-hidden="true"
-                    />
-                  )
-                })}
-                {floorSpaces.map((space) => {
-                  const matchesFilters = filteredSpaceIds.has(space.id)
-
-                  return (
-                    <button
-                      key={space.id}
-                      type="button"
-                      className={`map-space ${typeColors[space.type]}${selectedId === space.id ? ' is-selected' : ''}${matchesFilters ? '' : ' is-muted'}`}
-                      style={{ gridColumn: space.x + 1, gridRow: space.y + 1 }}
-                      onClick={() => selectSpace(space)}
-                      disabled={!matchesFilters}
-                      aria-pressed={selectedId === space.id}
-                      aria-label={`${space.name}, ${space.type}`}
-                      title={matchesFilters ? space.name : `${space.name} (no coincide con los filtros)`}
-                    >
-                      <span className="space-symbol" aria-hidden="true">
-                        {space.type === 'Baño' ? '◇' : space.type === 'Servicio' ? '＋' : '▦'}
-                      </span>
-                      <span>{space.name}</span>
-                    </button>
-                  )
-                })}
+                    return (
+                      <button
+                        key={space.id}
+                        type="button"
+                        className={`map-space ${typeColors[space.type]}${hiddenInAdmin ? ' is-hidden' : ''}${selectedId === space.id ? ' is-selected' : ''}${!adminMapActive && !matchesFilters ? ' is-muted' : ''}`}
+                        style={{ gridColumn: space.x + 1, gridRow: space.y + 1 }}
+                        onClick={() => setSelectedId(space.id)}
+                        disabled={!adminMapActive && !matchesFilters}
+                        aria-pressed={selectedId === space.id}
+                        aria-label={`${displayName}, ${space.type}${hiddenInAdmin ? ', oculta' : ''}`}
+                        title={hiddenInAdmin ? `${displayName} (oculta)` : matchesFilters ? displayName : `${displayName} (no coincide con los filtros)`}
+                      >
+                        <span className="space-symbol" aria-hidden="true">
+                          {space.type.startsWith('Baño') ? '◇' : space.type === 'Administrativo' ? '＋' : '▦'}
+                        </span>
+                        <span>{displayName}</span>
+                      </button>
+                    )
+                  })}
                 {floorSpaces.length === 0 && (
                   <div className="map-empty">No hay espacios cargados para este piso</div>
                 )}
               </div>
               <span className="north-indicator" aria-label="Norte">N <span>↑</span></span>
-              <div className="map-caption"><span /> Espacios de demostración · Piso {floor}</div>
+              <div className="map-caption"><span /> {adminMapActive ? 'Casillas ocultas en gris' : 'Espacios de demostración'} · Piso {floor}</div>
             </div>
 
             <div className="map-controls">
@@ -313,7 +313,15 @@ function App() {
           </section>
 
           <aside className="side-column">
-            <section className="detail-card" aria-live="polite">
+            {adminOpen ? (
+              <AdminPanel
+                floor={floor}
+                selectedSlotId={selectedId}
+                onSelectSlot={setSelectedId}
+                onSlotsChange={updateAdminSlots}
+                onSpacesChanged={() => setReloadKey((key) => key + 1)}
+              />
+            ) : <section className="detail-card" aria-live="polite">
               <div className="side-card-heading">
                 <h2>Detalle del espacio</h2>
                 <span className="detail-icon" aria-hidden="true">⌖</span>
@@ -350,7 +358,7 @@ function App() {
                   <p>Elige una sala o servicio en el mapa o en los resultados.</p>
                 </div>
               )}
-            </section>
+            </section>}
 
             <section className="results-card">
               <div className="side-card-heading">
@@ -369,7 +377,7 @@ function App() {
                     onClick={() => selectSpace(space)}
                   >
                     <span className={`list-icon ${typeColors[space.type]}`} aria-hidden="true">
-                      {space.type === 'Baño' ? '◇' : space.type === 'Servicio' ? '＋' : '▦'}
+                      {space.type.startsWith('Baño') ? '◇' : space.type === 'Administrativo' ? '＋' : '▦'}
                     </span>
                     <span className="list-copy">
                       <strong>{space.name}</strong>
@@ -391,7 +399,7 @@ function App() {
               </div>
             </section>
 
-            {selectedSpace && (
+            {!adminOpen && selectedSpace && (
               <button type="button" className="show-on-map" onClick={() => goToSpace(selectedSpace)}>
                 Ver {selectedSpace.name} en el mapa <span aria-hidden="true">↗</span>
               </button>

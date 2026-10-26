@@ -76,7 +76,7 @@ frontend/
 - Selección de piso y espacios en el plano o en la lista.
 - Panel con detalles ficticios del espacio seleccionado.
 - Plano esquemático interactivo en forma de L, con celdas seleccionables y espacios ficticios.
-- Controles de rotación, inclinación y zoom; la vista inicial es superior y plana.
+- Controles de rotación, inclinación y zoom; la vista inicial es inclinada y la opción «Vista plana» cambia a una vista superior.
 - Diseño adaptable a pantallas pequeñas.
 - API REST con Node.js y Express.
 

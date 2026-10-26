@@ -9,6 +9,9 @@ const typeColors: Record<SpaceType, string> = {
   Servicio: 'room-service',
 }
 
+const defaultView = { rotation: -25, tilt: 55, zoom: 90 }
+const flatView = { rotation: 0, tilt: 0, zoom: 90 }
+
 const floorSlots = [
   ...Array.from({ length: 12 }, (_, index) => ({
     x: index % 6,
@@ -30,9 +33,9 @@ function App() {
   const [accessibleOnly, setAccessibleOnly] = useState(false)
   const [floor, setFloor] = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [rotation, setRotation] = useState(0)
-  const [tilt, setTilt] = useState(0)
-  const [zoom, setZoom] = useState(90)
+  const [rotation, setRotation] = useState(defaultView.rotation)
+  const [tilt, setTilt] = useState(defaultView.tilt)
+  const [zoom, setZoom] = useState(defaultView.zoom)
 
   useEffect(() => {
     let cancelled = false
@@ -85,9 +88,15 @@ function App() {
   }
 
   function resetView() {
-    setRotation(0)
-    setTilt(0)
-    setZoom(90)
+    setRotation(defaultView.rotation)
+    setTilt(defaultView.tilt)
+    setZoom(defaultView.zoom)
+  }
+
+  function showFlatView() {
+    setRotation(flatView.rotation)
+    setTilt(flatView.tilt)
+    setZoom(flatView.zoom)
   }
 
   function goToSpace(space: Space) {
@@ -291,11 +300,14 @@ function App() {
                   type="button"
                   className="zoom-button"
                   aria-label="Acercar mapa"
-                  onClick={() => setZoom((value) => Math.min(120, value + 10))}
+                  onClick={() => setZoom((value) => Math.min(140, value + 10))}
                 >＋</button>
               </div>
               <button type="button" className="reset-button" onClick={resetView}>
                 <span aria-hidden="true">↺</span> Restablecer vista
+              </button>
+              <button type="button" className="reset-button" onClick={showFlatView}>
+                Vista plana
               </button>
             </div>
           </section>

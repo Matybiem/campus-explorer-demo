@@ -63,7 +63,7 @@ function App() {
 
       return matchesFloor && matchesType && matchesAccessibility && matchesQuery
     })
-  }, [accessibleOnly, floor, query, typeFilter])
+  }, [accessibleOnly, floor, query, spaces, typeFilter])
 
   const selectedSpace = spaces.find((space) => space.id === selectedId)
 

@@ -4,14 +4,13 @@ Aplicación de portafolio para explorar salas y servicios de un campus ficticio.
 
 ## Estado del proyecto
 
-El frontend ya está integrado en `main`. La API y su conexión con el frontend están en desarrollo en `feature/backend-api`; esa rama incluye la rama anterior `feature/frontend-mvp`.
+El frontend y la API están integrados en `main`. Los siguientes cambios se desarrollan en ramas cortas basadas en esa rama principal.
 
-Para ejecutar la versión integrada actual, clona el repositorio y sigue estas instrucciones. Para probar la API en desarrollo, cambia temporalmente a `feature/backend-api`:
+Clona el repositorio y entra en la carpeta:
 
 ```powershell
 git clone https://github.com/Matybiem/campus-explorer-demo.git
 cd campus-explorer-demo
-git switch feature/backend-api
 ```
 
 ## Tecnologías
@@ -32,28 +31,11 @@ git switch feature/backend-api
 Instala las dependencias desde la raíz del repositorio:
 
 ```powershell
+npm install --prefix backend
 npm install --prefix frontend
 ```
 
-Inicia el frontend:
-
-```powershell
-cd frontend
-npm run dev
-```
-
-Abre `http://localhost:5173`.
-
-### Ejecutar frontend y API
-
-Para usar también la API, cambia a `feature/backend-api` e instala las dependencias del backend:
-
-```powershell
-git switch feature/backend-api
-npm install --prefix backend
-```
-
-Inicia la API en una terminal:
+Inicia el backend en una terminal:
 
 ```powershell
 cd backend
@@ -66,6 +48,8 @@ Inicia el frontend en otra terminal:
 cd frontend
 npm run dev
 ```
+
+Abre `http://localhost:5173`.
 
 Vite reenvía las peticiones `/api` a Express en `http://localhost:3001`, según `frontend/vite.config.ts`. Comprueba el backend en `http://localhost:3001/api/health`. La ruta raíz `http://localhost:3001/` no sirve una página web porque el backend solo ofrece endpoints de API.
 
@@ -91,11 +75,12 @@ frontend/
 - Filtros por categoría y accesibilidad.
 - Selección de piso y espacios en el plano o en la lista.
 - Panel con detalles ficticios del espacio seleccionado.
-- Controles de giro y zoom del esquema en perspectiva.
+- Plano esquemático interactivo en forma de L, con celdas seleccionables y espacios ficticios.
+- Controles de rotación, inclinación y zoom; la vista inicial es inclinada y la opción «Vista plana» cambia a una vista superior.
 - Diseño adaptable a pantallas pequeñas.
-- API REST con Node.js y Express, disponible en `feature/backend-api`.
+- API REST con Node.js y Express.
 
-El plano actual es un esquema CSS interactivo en perspectiva: permite seleccionar espacios y ajustar giro y zoom, pero no es un modelo arquitectónico ni un visor 3D.
+El plano actual es un esquema CSS interactivo, no un modelo arquitectónico ni un visor 3D.
 
 ## Arquitectura y flujo de datos
 
@@ -104,7 +89,7 @@ El plano actual es un esquema CSS interactivo en perspectiva: permite selecciona
 3. Express aplica filtros opcionales y responde con los espacios ficticios desde `backend/data/spaces.js`.
 4. React muestra los espacios del piso seleccionado en el plano, la lista y el panel de detalle.
 
-En la rama de backend, los datos se mantienen en memoria y no se persisten. Para añadir espacios, edita `backend/data/spaces.js` manteniendo este contrato:
+Los datos se mantienen en memoria y no se persisten. Para añadir espacios, edita `backend/data/spaces.js` manteniendo este contrato:
 
 | Campo | Tipo | Descripción |
 | --- | --- | --- |
@@ -112,14 +97,14 @@ En la rama de backend, los datos se mantienen en memoria y no se persisten. Para
 | `name` | texto | Nombre que se muestra |
 | `type` | `Sala`, `Laboratorio`, `Baño` o `Servicio` | Categoría |
 | `floor` | número entero | Piso |
-| `x`, `y` | número | Posición porcentual en el esquema |
+| `x`, `y` | número entero | Columna y fila del espacio en la cuadrícula 6 × 6 con forma de L |
 | `capacity` | número, opcional | Capacidad referencial ficticia |
 | `accessible` | booleano | Indica accesibilidad en los datos de ejemplo |
 | `description` | texto | Descripción del espacio |
 
 Si cambia este contrato, actualiza los datos, `frontend/src/types.ts`, la validación de `frontend/src/api.ts` y las pruebas afectadas.
 
-## API (rama `feature/backend-api`)
+## API
 
 - `GET /api/health`: devuelve el estado del backend.
 - `GET /api/spaces`: lista todos los espacios ficticios.
@@ -135,7 +120,7 @@ Ejecuta desde la raíz del repositorio:
 npm run build --prefix frontend
 ```
 
-En `feature/backend-api`, ejecuta además las pruebas de API:
+Ejecuta además las pruebas de API:
 
 ```powershell
 npm test --prefix backend
@@ -145,7 +130,7 @@ Antes de proponer cambios, verifica el recorrido local: interfaz en `http://loca
 
 ## Guía de desarrollo
 
-- **Interfaz y comportamiento:** modifica `frontend/src/App.tsx` y `frontend/src/styles.css`. Cuando esté disponible la API, carga los espacios desde ella y evita duplicar el catálogo en el frontend.
+- **Interfaz y comportamiento:** modifica `frontend/src/App.tsx` y `frontend/src/styles.css`. Carga los espacios desde la API y evita duplicar el catálogo en el frontend.
 - **Endpoints y filtros:** modifica `backend/app.js`, añade pruebas en `backend/test/api.test.js` y documenta los parámetros nuevos.
 - **Datos de ejemplo:** edita `backend/data/spaces.js` usando exclusivamente información inventada.
 - **Persistencia:** no hay base de datos. Antes de añadir una, define qué datos se guardarán y sus requisitos de privacidad.
@@ -155,8 +140,7 @@ Antes de proponer cambios, verifica el recorrido local: interfaz en `http://loca
 ## Ramas y commits
 
 - `main`: base integrada del proyecto.
-- `feature/frontend-mvp`: rama ya integrada mediante pull request.
-- `feature/backend-api`: API y conexión frontend-backend; se integra después del frontend.
+- `feature/frontend-mvp` y `feature/backend-api`: ramas ya integradas mediante pull requests.
 
 Para las siguientes funcionalidades, crea ramas breves basadas en `main`, por ejemplo `feature/map-improvements` o `feature/admin-panel`. Si una tarea depende de cambios aún no integrados, coordina los pull requests en orden.
 

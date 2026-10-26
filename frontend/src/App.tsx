@@ -9,6 +9,20 @@ const typeColors: Record<SpaceType, string> = {
   Servicio: 'room-service',
 }
 
+const defaultView = { rotation: -25, tilt: 55, zoom: 90 }
+const flatView = { rotation: 0, tilt: 0, zoom: 90 }
+
+const floorSlots = [
+  ...Array.from({ length: 12 }, (_, index) => ({
+    x: index % 6,
+    y: Math.floor(index / 6),
+  })),
+  ...Array.from({ length: 8 }, (_, index) => ({
+    x: 4 + (index % 2),
+    y: 2 + Math.floor(index / 2),
+  })),
+]
+
 function App() {
   const [spaces, setSpaces] = useState<Space[]>([])
   const [loading, setLoading] = useState(true)
@@ -19,9 +33,9 @@ function App() {
   const [accessibleOnly, setAccessibleOnly] = useState(false)
   const [floor, setFloor] = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [rotation, setRotation] = useState(-12)
-  const [tilt, setTilt] = useState(52)
-  const [zoom, setZoom] = useState(90)
+  const [rotation, setRotation] = useState(defaultView.rotation)
+  const [tilt, setTilt] = useState(defaultView.tilt)
+  const [zoom, setZoom] = useState(defaultView.zoom)
 
   useEffect(() => {
     let cancelled = false
@@ -66,15 +80,23 @@ function App() {
   }, [accessibleOnly, floor, query, spaces, typeFilter])
 
   const selectedSpace = spaces.find((space) => space.id === selectedId)
+  const floorSpaces = spaces.filter((space) => space.floor === floor)
+  const filteredSpaceIds = new Set(filteredSpaces.map((space) => space.id))
 
   function selectSpace(space: Space) {
     setSelectedId(space.id)
   }
 
   function resetView() {
-    setRotation(-12)
-    setTilt(52)
-    setZoom(90)
+    setRotation(defaultView.rotation)
+    setTilt(defaultView.tilt)
+    setZoom(defaultView.zoom)
+  }
+
+  function showFlatView() {
+    setRotation(flatView.rotation)
+    setTilt(flatView.tilt)
+    setZoom(flatView.zoom)
   }
 
   function goToSpace(space: Space) {
@@ -160,7 +182,7 @@ function App() {
             <div className="card-heading">
               <div>
                 <h2>Mapa del campus</h2>
-                <p>Selecciona un espacio para ver sus detalles</p>
+                <p>Plano esquemático · selecciona una sala para ver sus detalles</p>
               </div>
               <label className="floor-picker">
                 <span className="sr-only">Seleccionar piso</span>
@@ -180,26 +202,52 @@ function App() {
                   transform: `rotateX(${tilt}deg) rotateZ(${rotation}deg) scale(${zoom / 100})`,
                 }}
               >
-                <div className="hallway hallway-horizontal" />
-                <div className="hallway hallway-vertical" />
-                {filteredSpaces.map((space) => (
-                  <button
-                    key={space.id}
-                    type="button"
-                    className={`map-space ${typeColors[space.type]}${selectedId === space.id ? ' is-selected' : ''}`}
-                    style={{ left: `${space.x}%`, top: `${space.y}%` }}
-                    onClick={() => selectSpace(space)}
-                    aria-pressed={selectedId === space.id}
-                    aria-label={`${space.name}, ${space.type}`}
-                  >
-                    <span className="space-symbol" aria-hidden="true">
-                      {space.type === 'Baño' ? '◇' : space.type === 'Servicio' ? '＋' : '▦'}
-                    </span>
-                    <span>{space.name}</span>
-                  </button>
-                ))}
-                {filteredSpaces.length === 0 && (
-                  <div className="map-empty">No hay espacios que coincidan</div>
+                <svg
+                  className="floor-outline"
+                  viewBox="0 0 600 600"
+                  role="img"
+                  aria-label="Plano esquemático de un edificio con forma de L"
+                >
+                  <path d="M3 3 H597 V597 H403 V203 H3 Z" />
+                </svg>
+                {floorSlots.map((slot) => {
+                  const hasSpace = floorSpaces.some(
+                    (space) => space.x === slot.x && space.y === slot.y,
+                  )
+
+                  return hasSpace ? null : (
+                    <div
+                      key={`empty-${slot.x}-${slot.y}`}
+                      className="map-space-placeholder"
+                      style={{ gridColumn: slot.x + 1, gridRow: slot.y + 1 }}
+                      aria-hidden="true"
+                    />
+                  )
+                })}
+                {floorSpaces.map((space) => {
+                  const matchesFilters = filteredSpaceIds.has(space.id)
+
+                  return (
+                    <button
+                      key={space.id}
+                      type="button"
+                      className={`map-space ${typeColors[space.type]}${selectedId === space.id ? ' is-selected' : ''}${matchesFilters ? '' : ' is-muted'}`}
+                      style={{ gridColumn: space.x + 1, gridRow: space.y + 1 }}
+                      onClick={() => selectSpace(space)}
+                      disabled={!matchesFilters}
+                      aria-pressed={selectedId === space.id}
+                      aria-label={`${space.name}, ${space.type}`}
+                      title={matchesFilters ? space.name : `${space.name} (no coincide con los filtros)`}
+                    >
+                      <span className="space-symbol" aria-hidden="true">
+                        {space.type === 'Baño' ? '◇' : space.type === 'Servicio' ? '＋' : '▦'}
+                      </span>
+                      <span>{space.name}</span>
+                    </button>
+                  )
+                })}
+                {floorSpaces.length === 0 && (
+                  <div className="map-empty">No hay espacios cargados para este piso</div>
                 )}
               </div>
               <span className="north-indicator" aria-label="Norte">N <span>↑</span></span>
@@ -208,14 +256,27 @@ function App() {
 
             <div className="map-controls">
               <div className="control-group">
-                <label htmlFor="rotation">Giro</label>
+                <label htmlFor="rotation">Rotación</label>
                 <input
                   id="rotation"
                   type="range"
-                  min="-40"
-                  max="40"
+                  min="-180"
+                  max="180"
                   value={rotation}
                   onChange={(event) => setRotation(Number(event.target.value))}
+                  aria-label={`Rotación: ${rotation} grados`}
+                />
+              </div>
+              <div className="control-group">
+                <label htmlFor="tilt">Inclinación</label>
+                <input
+                  id="tilt"
+                  type="range"
+                  min="0"
+                  max="70"
+                  value={tilt}
+                  onChange={(event) => setTilt(Number(event.target.value))}
+                  aria-label={`Inclinación: ${tilt} grados`}
                 />
               </div>
               <div className="control-group">
@@ -230,19 +291,23 @@ function App() {
                   id="zoom"
                   type="range"
                   min="60"
-                  max="120"
+                  max="140"
                   value={zoom}
                   onChange={(event) => setZoom(Number(event.target.value))}
+                  aria-label={`Zoom: ${zoom} por ciento`}
                 />
                 <button
                   type="button"
                   className="zoom-button"
                   aria-label="Acercar mapa"
-                  onClick={() => setZoom((value) => Math.min(120, value + 10))}
+                  onClick={() => setZoom((value) => Math.min(140, value + 10))}
                 >＋</button>
               </div>
               <button type="button" className="reset-button" onClick={resetView}>
                 <span aria-hidden="true">↺</span> Restablecer vista
+              </button>
+              <button type="button" className="reset-button" onClick={showFlatView}>
+                Vista plana
               </button>
             </div>
           </section>

@@ -35,7 +35,7 @@ export const spaces = [
   {
     id: 'B-1',
     name: 'Baño universal',
-    type: 'Baño',
+    type: 'Baño mujer',
     floor: 1,
     x: 4,
     y: 2,
@@ -44,8 +44,8 @@ export const spaces = [
   },
   {
     id: 'B-2',
-    name: 'Baño',
-    type: 'Baño',
+    name: 'Baño hombre',
+    type: 'Baño hombre',
     floor: 1,
     x: 5,
     y: 2,
@@ -55,7 +55,7 @@ export const spaces = [
   {
     id: 'INFO',
     name: 'Punto de información',
-    type: 'Servicio',
+    type: 'Administrativo',
     floor: 1,
     x: 4,
     y: 3,
@@ -87,7 +87,7 @@ export const spaces = [
   {
     id: 'B-3',
     name: 'Baño universal',
-    type: 'Baño',
+    type: 'Baño mujer',
     floor: 2,
     x: 4,
     y: 2,
@@ -96,8 +96,8 @@ export const spaces = [
   },
   {
     id: 'ESTUDIO',
-    name: 'Zona de estudio',
-    type: 'Servicio',
+    name: 'Sala de estudio',
+    type: 'Sala',
     floor: 2,
     x: 4,
     y: 3,

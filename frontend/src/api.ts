@@ -1,6 +1,12 @@
 import type { Space, SpaceType } from './types'
 
-const spaceTypes: SpaceType[] = ['Sala', 'Laboratorio', 'Baño', 'Servicio']
+const spaceTypes: SpaceType[] = [
+  'Sala',
+  'Laboratorio',
+  'Administrativo',
+  'Baño hombre',
+  'Baño mujer',
+]
 
 function isSpace(value: unknown): value is Space {
   if (typeof value !== 'object' || value === null) return false
@@ -14,7 +20,7 @@ function isSpace(value: unknown): value is Space {
     typeof space.floor === 'number' &&
     typeof space.x === 'number' &&
     typeof space.y === 'number' &&
-    (space.capacity === undefined || typeof space.capacity === 'number') &&
+    (space.capacity === undefined || space.capacity === null || typeof space.capacity === 'number') &&
     typeof space.accessible === 'boolean' &&
     typeof space.description === 'string'
   )

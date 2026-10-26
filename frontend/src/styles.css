@@ -297,12 +297,15 @@ h1 {
   width: 100%;
   height: 100%;
   overflow: visible;
+  filter: drop-shadow(10px 12px 0 #bdcbd8) drop-shadow(0 8px 10px #34495e30);
   pointer-events: none;
 }
 .floor-outline path {
-  fill: none;
-  stroke: #34383b;
-  stroke-width: 5;
+  fill: #f6f9fc;
+  stroke: #aebdcb;
+  stroke-width: 4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
   vector-effect: non-scaling-stroke;
 }
 .map-space-placeholder {
@@ -311,7 +314,10 @@ h1 {
   aspect-ratio: 1;
   justify-self: center;
   align-self: center;
-  border: 4px solid #34383b;
+  background: #edf3f8;
+  border: 3px solid #aab9c8;
+  border-radius: 7px;
+  box-shadow: 0 3px 0 #cad5df, 0 5px 9px #4057741c;
 }
 .map-space {
   z-index: 1;
@@ -328,14 +334,23 @@ h1 {
   padding: 5px;
   overflow: hidden;
   color: #275178;
-  border: 4px solid #34383b;
-  border-radius: 0;
+  border: 3px solid #aab9c8;
+  border-radius: 7px;
+  box-shadow: 0 3px 0 #cad5df, 0 5px 9px #4057741c;
   cursor: pointer;
   text-align: center;
   transition: background .15s, box-shadow .15s, transform .15s;
 }
-.map-space:hover:not(:disabled) { z-index: 2; transform: translateZ(8px); box-shadow: 0 5px 12px #334b672b; }
-.map-space.is-selected { z-index: 2; box-shadow: 0 0 0 3px #186bd2, 0 6px 15px #334b6730; }
+.map-space:hover:not(:disabled) {
+  z-index: 2;
+  transform: translateY(-2px) translateZ(8px);
+  box-shadow: 0 5px 0 #c4d0dc, 0 9px 15px #334b6730;
+}
+.map-space.is-selected {
+  z-index: 2;
+  border-color: #4385c8;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 5px #4385c8, 0 6px 12px #334b6730;
+}
 .map-space.is-muted { opacity: .35; cursor: not-allowed; }
 .map-space > span:last-child { font-size: clamp(8px, .9vw, 11px); font-weight: 700; }
 .space-symbol { font-size: 15px; font-weight: 500; }
@@ -343,9 +358,6 @@ h1 {
 .room-lab { color: #6170a5; background: #e5e7ff; border-color: #cfd3fa; }
 .room-bathroom { color: #268276; background: #d9f2ed; border-color: #b8e5db; }
 .room-service { color: #a07632; background: #fff0d6; border-color: #f0dcaf; }
-.map-space.room-classroom, .map-space.room-lab, .map-space.room-bathroom, .map-space.room-service {
-  border-color: #34383b;
-}
 .map-empty {
   position: absolute;
   z-index: 3;

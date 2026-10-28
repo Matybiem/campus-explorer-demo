@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { Icon } from './icons'
 import SpaceIcon from './SpaceIcon'
 import { getSpaceColorClass, spaceKinds } from './types'
 
@@ -11,15 +12,6 @@ type FiltersPanelProps = {
   onToggleAccessible: () => void
   onReset: () => void
   onClose: () => void
-}
-
-function AccessibleIcon() {
-  return (
-    <svg className="space-icon-outline" viewBox="0 0 48 48" aria-hidden="true">
-      <circle cx="22" cy="7" r="4" />
-      <path d="M22 15v15h11l5 12M22 22h11M17 26a10 10 0 1 0 13 14" />
-    </svg>
-  )
 }
 
 function FiltersPanel({
@@ -58,7 +50,7 @@ function FiltersPanel({
           <p>Los espacios en color se muestran; los grises se ocultan.</p>
         </div>
         <button ref={closeButtonRef} type="button" className="filters-close" onClick={onClose} aria-label="Cerrar filtros">
-          ✕
+          <Icon name="x" />
         </button>
       </div>
 
@@ -85,7 +77,7 @@ function FiltersPanel({
           aria-pressed={accessibleOnly}
           onClick={onToggleAccessible}
         >
-          <AccessibleIcon />
+          <Icon name="wheelchair" />
           <span>Accesible</span>
         </button>
       </div>

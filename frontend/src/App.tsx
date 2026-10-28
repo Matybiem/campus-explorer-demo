@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import AdminPanel from './AdminPanel'
 import FiltersPanel from './FiltersPanel'
+import { Icon } from './icons'
 import SpaceIcon from './SpaceIcon'
 import { fetchFloorPlan, fetchFloors, fetchSpaces } from './api'
 import { setAdminFloorActive } from './adminApi'
@@ -447,7 +448,7 @@ function App() {
             </p>
           </div>
           <div className="campus-chip">
-            <span className="campus-icon" aria-hidden="true">⌂</span>
+            <span className="campus-icon" aria-hidden="true"><Icon name="home" /></span>
             Campus de demostración
           </div>
         </section>
@@ -487,7 +488,7 @@ function App() {
                       <option key={item.floor} value={item.floor}>{floorLabel(item.floor)}</option>
                     ))}
                   </select>
-                  <span aria-hidden="true">⌄</span>
+                  <span aria-hidden="true"><Icon name="chevron-down" /></span>
                 </label>
                 {!adminMapActive && (
                   <button
@@ -510,14 +511,14 @@ function App() {
                         type="button"
                         disabled={floorBusy || hasPendingAdminChanges || highestFloor >= 10}
                         onClick={() => void changeFloorActive(highestFloor + 1, true)}
-                      >＋ Piso</button>
+                      ><Icon name="plus" /> Piso</button>
                       <button
                         type="button"
                         disabled={floorBusy || hasPendingAdminChanges || highestFloor <= 1}
                         onClick={() => void changeFloorActive(highestFloor, false)}
                         aria-label={`Desactivar ${floorLabel(highestFloor)}`}
                         title={`Desactivar ${floorLabel(highestFloor)}`}
-                      >−</button>
+                      ><Icon name="minus" /></button>
                     </div>
                     <div>
                       <span>{activeBasements.length}/5 subterráneos</span>
@@ -525,14 +526,14 @@ function App() {
                         type="button"
                         disabled={floorBusy || hasPendingAdminChanges || deepestBasement <= -5}
                         onClick={() => void changeFloorActive(deepestBasement - 1, true)}
-                      >＋ Subterráneo</button>
+                      ><Icon name="plus" /> Subterráneo</button>
                       <button
                         type="button"
                         disabled={floorBusy || hasPendingAdminChanges || deepestBasement === 0}
                         onClick={() => void changeFloorActive(deepestBasement, false)}
                         aria-label={deepestBasement === 0 ? 'No hay subterráneos que desactivar' : `Desactivar ${floorLabel(deepestBasement)}`}
                         title={deepestBasement === 0 ? 'No hay subterráneos que desactivar' : `Desactivar ${floorLabel(deepestBasement)}`}
-                      >−</button>
+                      ><Icon name="minus" /></button>
                     </div>
                   </div>
                 )}
@@ -751,7 +752,7 @@ function App() {
                   )}
                 </div>
               </div>
-              <span className="north-indicator" aria-label="Norte">N <span>↑</span></span>
+              <span className="north-indicator" aria-label="Norte">N <span><Icon name="arrow-up" /></span></span>
               <div className="map-caption"><span /> {adminMapActive ? 'Casillas ocultas en gris' : 'Espacios de demostración'} · {floorLabel(floor)}</div>
             </div>
 
@@ -787,7 +788,9 @@ function App() {
                   className="zoom-button"
                   aria-label="Alejar mapa"
                   onClick={() => setZoom((value) => Math.max(minZoom, value - 10))}
-                >−</button>
+                >
+                  <Icon name="minus" />
+                </button>
                 <input
                   id="zoom"
                   type="range"
@@ -802,10 +805,12 @@ function App() {
                   className="zoom-button"
                   aria-label="Acercar mapa"
                   onClick={() => setZoom((value) => Math.min(maxZoom, value + 10))}
-                >＋</button>
+                >
+                  <Icon name="plus" />
+                </button>
               </div>
               <button type="button" className="reset-button" onClick={resetView}>
-                <span aria-hidden="true">↺</span> Restablecer vista
+                <span aria-hidden="true"><Icon name="refresh" /></span> Restablecer vista
               </button>
               <button type="button" className="reset-button" onClick={showFlatView}>
                 Vista plana
@@ -828,7 +833,7 @@ function App() {
             ) : <section className="detail-card" aria-live="polite">
               <div className="side-card-heading">
                 <h2>Detalle del espacio</h2>
-                <span className="detail-icon" aria-hidden="true">⌖</span>
+                <span className="detail-icon" aria-hidden="true"><Icon name="current-location" /></span>
               </div>
               {selectedSpace ? (
                 <div className="selected-details">
@@ -862,7 +867,7 @@ function App() {
                 </div>
               ) : (
                 <div className="empty-detail">
-                  <span className="empty-detail-icon" aria-hidden="true">⌖</span>
+                  <span className="empty-detail-icon" aria-hidden="true"><Icon name="current-location" /></span>
                   <h3>Selecciona un espacio</h3>
                   <p>Elige una sala o servicio en el mapa o en los resultados.</p>
                 </div>
@@ -871,7 +876,7 @@ function App() {
 
             <section className="search-panel" aria-label="Buscar espacios">
               <label className="search-field">
-                <span className="search-icon" aria-hidden="true">⌕</span>
+                <span className="search-icon" aria-hidden="true"><Icon name="search" /></span>
                 <span className="sr-only">Buscar por nombre, código, tipo o categoría</span>
                 <input
                   type="search"
@@ -879,7 +884,7 @@ function App() {
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                 />
-                <kbd>↵</kbd>
+                <kbd aria-hidden="true"><Icon name="corner-down-left" /></kbd>
               </label>
               <div className="search-filters">
                 <button
@@ -890,7 +895,7 @@ function App() {
                   aria-controls="filters-drawer"
                   onClick={() => setFiltersOpen((value) => !value)}
                 >
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5Z" /></svg>
+                  <Icon name="filter" />
                   Filtros
                   {activeFilterCount > 0 && (
                     <span
@@ -927,11 +932,11 @@ function App() {
                       <strong>{getSpaceLabel(space)}</strong>
                       <span>{space.type} · {floorLabel(space.floor)}</span>
                     </span>
-                    <span className="list-arrow" aria-hidden="true">›</span>
+                    <span className="list-arrow" aria-hidden="true"><Icon name="chevron-right" /></span>
                   </button>
                 )) : (
                   <div className="no-results">
-                    <span aria-hidden="true">⌕</span>
+                    <span aria-hidden="true"><Icon name="search" /></span>
                     <p>No encontramos espacios con esos filtros.</p>
                     <button type="button" onClick={() => {
                       setQuery('')
@@ -944,14 +949,14 @@ function App() {
 
             {!adminOpen && selectedSpace && (
               <button type="button" className="show-on-map" onClick={() => goToSpace(selectedSpace)}>
-                Ver {getSpaceLabel(selectedSpace)} en el mapa <span aria-hidden="true">↗</span>
+                Ver {getSpaceLabel(selectedSpace)} en el mapa <span aria-hidden="true"><Icon name="arrow-up-right" /></span>
               </button>
             )}
           </aside>
         </div>
 
         <footer className="page-footer">
-          <span className="footer-mark">i</span>
+          <span className="footer-mark" aria-hidden="true"><Icon name="info-circle" /></span>
           <p>
             Prototipo de portafolio con datos inventados. No representa una sede real ni
             muestra información institucional.

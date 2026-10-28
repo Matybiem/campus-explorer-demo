@@ -96,6 +96,10 @@ backend/
 frontend/
   src/App.tsx            Interfaz, búsqueda, filtros y selección
   src/AdminPanel.tsx     Inicio de sesión y edición de casillas
+  src/FiltersPanel.tsx   Panel lateral con la botonera de filtros
+  src/SpaceCategoryPicker.tsx  Desplegable de categorías de espacios comunes
+  src/SpaceIcon.tsx      Icono de cada tipo y categoría de espacio
+  src/icons.tsx          Iconos SVG de Tabler Icons usados en la interfaz
   src/api.ts             Cliente y validación de respuestas API
   src/adminApi.ts        Cliente de endpoints protegidos
   src/types.ts           Tipos del frontend
@@ -135,7 +139,7 @@ El mapa muestra los espacios de un piso sobre una cuadrícula fija, con la super
 - **Paredes:** se levantan en cada borde exterior del contorno, con una altura igual al ancho de una casilla (`wallHeight`). Son translúcidas, así que las salas se siguen viendo, y no interceptan los clics.
 - **Selector de nivel:** lista solo los niveles activos, de arriba hacia abajo: Piso 4, Piso 3, Piso 2, Piso 1, Subterráneo 1, Subterráneo 2.
 - **Selección:** un clic sobre una sala la resalta y muestra su detalle.
-- **Tipos y categorías:** cada tipo de espacio y cada categoría de espacio común tiene su propio color e icono.
+- **Tipos y categorías:** cada tipo de espacio y cada categoría de espacio común tiene su propio color e icono. Todos los iconos de la interfaz son de Tabler Icons, en estilo de contorno.
 
 ### RF-02 Navegación del mapa
 
@@ -347,6 +351,34 @@ test(backend): cover invalid space filters
 ```
 
 Tipos habituales: `feat`, `fix`, `docs`, `test` y `refactor`.
+
+## Créditos y licencias
+
+Los iconos de la interfaz provienen de [Tabler Icons](https://tabler.io/icons). Solo se copian los SVG necesarios en `frontend/src/icons.tsx`, sin instalar el paquete. Para agregar un icono, copia sus trazados desde Tabler (estilo `outline`) a ese archivo.
+
+```text
+MIT License
+
+Copyright (c) 2020-2026 Paweł Kuna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## Privacidad y alcance de la demo
 

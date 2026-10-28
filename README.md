@@ -4,7 +4,9 @@ Aplicación de portafolio para explorar salas y servicios de un campus ficticio.
 
 ## Estado del proyecto
 
-El panel de administración se desarrolla en `feature/admin-panel`, basada en `feature/map-improvements`. La rama incluye el plano interactivo con vistas plana e inclinada, la API y la configuración admin. Cambia a esa rama para probar esta funcionalidad:
+Versión actual: **v1.1.0**. Para volver a este punto: `git checkout v1.1.0`. El trabajo posterior se desarrolla en ramas nuevas (`feature/...`) y las versiones se marcan con tags (`vMAYOR.MENOR.PARCHE`).
+
+La rama `feature/fixed-floor-matrix-contour` incluye el plano interactivo con matriz fija de 15 × 15, el panel de administración y la API. Para probarla:
 
 Clona el repositorio y entra en la carpeta:
 
@@ -12,7 +14,7 @@ Clona el repositorio y entra en la carpeta:
 git clone https://github.com/Matybiem/campus-explorer-demo.git
 cd campus-explorer-demo
 git fetch origin
-git switch --track origin/feature/admin-panel
+git switch --track origin/feature/fixed-floor-matrix-contour
 ```
 
 ## Tecnologías
@@ -107,9 +109,13 @@ frontend/
 - Filtros por categoría y accesibilidad.
 - Selección de piso y espacios en el plano o en la lista.
 - Panel con detalles ficticios del espacio seleccionado.
-- Plano esquemático interactivo en forma de L, con celdas seleccionables y espacios ficticios.
-- Controles de rotación, inclinación y zoom; la vista inicial es inclinada y la opción «Vista plana» cambia a una vista superior.
-- Panel admin protegido junto al mapa para activar u ocultar casillas y editar el nombre y tipo de cada espacio; en modo administración se muestran todas las casillas y las ocultas aparecen en gris.
+- Plano interactivo editable como matriz fija de 15 × 15 casillas por nivel; el contorno configurable define la superficie visible del piso sin mostrar casillas ocultas como salas.
+- Controles de rotación, inclinación y zoom (20 % a 140 %); la vista inicial es inclinada y la opción «Vista plana» cambia a una vista superior. Con el clic derecho sostenido sobre el mapa se desplaza el plano («mano»).
+- Botón «Ver todos los pisos»: muestra todos los niveles activos apilados como planos de 15 × 15 alineados sobre el eje Z, con el piso más alto arriba; el piso seleccionado queda separado del que tiene encima.
+- En modo administración, mantener presionado el clic izquierdo sobre una casilla (0,4 s) y soltarla sobre otra intercambia sus datos como un cambio pendiente.
+- Panel admin protegido junto al mapa para activar u ocultar casillas y editar el nombre y tipo de cada espacio; el nombre puede quedar vacío y en ese caso se muestra el código de la casilla. En modo administración se muestran todas las casillas y las ocultas aparecen en gris.
+- En modo administración se pueden editar las 225 casillas del nivel, incluidas las ocultas, y definir cuáles ocultas forman parte del contorno del piso. Las casillas visibles siempre forman parte del contorno.
+- El perfil de administrador puede agregar y desactivar niveles en orden: hasta 10 pisos y 5 subterráneos. Solo se desactiva el último nivel de cada secuencia, el Piso 1 permanece activo y las salas se conservan al desactivar un nivel.
 - Diseño adaptable a pantallas pequeñas.
 - API REST con Node.js y Express.
 
@@ -122,34 +128,44 @@ El plano actual es un esquema CSS interactivo, no un modelo arquitectónico ni u
 3. Express aplica filtros opcionales y consulta PostgreSQL; `backend/data/spaces.js` se usa solo para poblar espacios ficticios iniciales en posiciones vacías.
 4. React muestra los espacios del piso seleccionado en el plano, la lista y el panel de detalle.
 
-Las casillas se almacenan en PostgreSQL. El arranque crea 20 posiciones para cada piso y añade los espacios ficticios iniciales solo en posiciones vacías; no sobrescribe cambios existentes. Para cambiar los datos iniciales de una base nueva, edita `backend/data/spaces.js`.
+Los niveles y casillas se almacenan en PostgreSQL. Los pisos usan los números 1 a 10 y los subterráneos -1 a -5. Cada nivel tiene exactamente 225 casillas en una matriz de 15 × 15; los espacios ficticios de `backend/data/spaces.js` se conservan al crear una base nueva. Al iniciar una base existente, la migración conserva los datos de las casillas, mantiene sus coordenadas cuando caben y recoloca las que quedan fuera de rango. Si un nivel tiene más de 225 casillas, el arranque falla explícitamente para no perder registros.
 
 | Campo | Tipo | Descripción |
 | --- | --- | --- |
 | `id` | texto | Identificador único del espacio |
 | `name` | texto | Nombre que se muestra |
-| `type` | `Sala`, `Laboratorio`, `Administrativo`, `Baño hombre` o `Baño mujer` | Categoría |
+| `type` | `Sala`, `Laboratorio`, `Administrativo` o `Espacio común` | Tipo principal |
+| `category` | `Baño hombre`, `Baño mujer`, `Escalera`, `Ascensor` o `Comida`; nulo para otros tipos | Subcategoría de un espacio común, con su icono y color |
 | `floor` | número entero | Piso |
-| `x`, `y` | número entero | Columna y fila del espacio en la cuadrícula 6 × 6 con forma de L |
+| `x`, `y` | número entero entre 0 y 14 | Columna y fila en la matriz fija de 15 × 15 |
 | `enabled` | booleano | Si está activo, se muestra en el mapa público |
+| `use_contour` | booleano | Incluye una casilla oculta en la superficie visible del piso |
 | `capacity` | número, opcional | Capacidad referencial ficticia |
 | `accessible` | booleano | Indica accesibilidad en los datos de ejemplo |
 | `description` | texto | Descripción del espacio |
 
-La interfaz de administración guarda cada casilla explícitamente con «Guardar cambios». Las casillas desactivadas no aparecen en el mapa público. Si cambia el contrato, actualiza PostgreSQL, los repositorios, `frontend/src/types.ts`, la validación API y las pruebas afectadas.
+La interfaz de administración permite seleccionar primero el tipo principal y luego editar el nombre; para «Espacio común», el nombre se reemplaza por una categoría seleccionable (baño hombre, baño mujer, escalera, ascensor o comida). Cada categoría tiene su propio icono y color. Los cambios de nombre, tipo, categoría, visibilidad, accesibilidad y descripción quedan pendientes hasta guardar juntos todos los cambios del piso. Las descripciones admiten hasta 500 caracteres y se muestran en los detalles públicos debajo de la accesibilidad. No permite cerrar la administración ni cambiar de piso hasta guardar los cambios. Las casillas desactivadas no aparecen en el mapa público. Si cambia el contrato, actualiza PostgreSQL, los repositorios, `frontend/src/types.ts`, la validación API y las pruebas afectadas.
+
+La tabla `floor_plans` almacena el nivel, su estado activo y dimensiones fijas de 15 × 15. Los niveles se activan consecutivamente: el siguiente piso disponible es el número posterior al último activo y el siguiente subterráneo es el siguiente número negativo. Se desactiva solo el último piso o el subterráneo más profundo; el Piso 1 no se puede desactivar. Esta regla evita huecos (por ejemplo, no se puede desactivar el Piso 3 mientras el Piso 4 siga activo). Desactivar un nivel lo oculta del selector y del mapa público, pero conserva su configuración y casillas para poder reactivarlo.
+
+En administración, las casillas visibles siempre pertenecen a la superficie del piso y la opción «Usar contorno» queda forzada mientras estén visibles. Las casillas ocultas con esa opción activa rellenan el piso en vista de usuario sin aparecer como espacios seleccionables. La opción de una casilla visible se conserva al ocultarla para que el administrador pueda decidir después si debe quedar fuera del contorno.
 
 ## API
 
 - `GET /api/health`: devuelve el estado del backend.
+- `GET /api/floors`: lista los pisos y subterráneos activos para el selector público.
+- `GET /api/floors/:floor/plan`: devuelve las dimensiones fijas de 15 × 15 y las coordenadas de superficie (`enabled` o `use_contour`).
 - `GET /api/spaces`: lista solo espacios activados.
 - `GET /api/spaces?q=sala&type=Sala&floor=1&accessible=true`: filtra por texto, tipo, piso y accesibilidad; todos los parámetros son opcionales.
 - `GET /api/admin/session`: devuelve si hay una sesión admin activa.
 - `POST /api/admin/login`: autentica usuario y contraseña.
 - `POST /api/admin/logout`: cierra la sesión.
 - `GET /api/admin/slots?floor=1`: lista todas las casillas de un piso; requiere sesión admin.
-- `PATCH /api/admin/slots/:id`: guarda `name`, `type` y `enabled`; requiere sesión admin.
+- `PATCH /api/admin/floors/:floor/slots`: guarda juntos hasta 225 casillas (nombre, tipo, visibilidad, contorno, accesibilidad y descripción) en una transacción; requiere sesión admin.
+- `PATCH /api/admin/floors/:floor/active`: agrega o desactiva un piso/subterráneo siguiendo el orden y los límites establecidos; requiere sesión admin.
+- `PATCH /api/admin/slots/:id`: guarda una casilla individual; `name` es opcional y admite hasta 60 caracteres; requiere sesión admin.
 
-Los tipos admitidos son `Sala`, `Laboratorio`, `Administrativo`, `Baño hombre` y `Baño mujer`. Los filtros inválidos devuelven estado HTTP `400` con un mensaje JSON. Las rutas de edición requieren sesión y las contraseñas no se envían al frontend después del login.
+Los tipos principales admitidos son `Sala`, `Laboratorio`, `Administrativo` y `Espacio común`. Los espacios comunes requieren una categoría de `Baño hombre`, `Baño mujer`, `Escalera`, `Ascensor` o `Comida`; los tipos de baño independientes ya no se aceptan. La migración convierte los tipos de baño existentes en espacios comunes y conserva su categoría. Los filtros inválidos devuelven estado HTTP `400` con un mensaje JSON. Las rutas de edición requieren sesión y las contraseñas no se envían al frontend después del login.
 
 ## Pruebas y compilación
 
@@ -183,6 +199,7 @@ Las pruebas de API usan repositorios simulados para no exigir una base PostgreSQ
 - `feature/frontend-mvp` y `feature/backend-api`: ramas ya integradas mediante pull requests.
 - `feature/map-improvements`: plano en “L”; base de `feature/admin-panel`.
 - `feature/admin-panel`: configuración PostgreSQL y administración protegida.
+- `feature/resizable-floor-plan`: ajuste persistente del tamaño de los brazos del plano por piso.
 
 Para las siguientes funcionalidades, crea ramas breves basadas en `main`. Si una rama depende de cambios aún no integrados, integra primero la rama base y luego actualiza la dependiente.
 

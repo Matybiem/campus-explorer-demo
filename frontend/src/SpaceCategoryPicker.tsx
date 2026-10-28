@@ -1,4 +1,5 @@
 import { useRef } from 'react'
+import { Icon } from './icons'
 import SpaceIcon from './SpaceIcon'
 import { getSpaceColorClass, spaceCategories, type SpaceCategory } from './types'
 
@@ -20,9 +21,9 @@ function SpaceCategoryPicker({ value, disabled, onChange }: SpaceCategoryPickerP
           if (disabled) event.preventDefault()
         }}
       >
-        {value ? <SpaceIcon type="Espacio común" category={value} /> : <span className="category-picker-placeholder">?</span>}
+        {value ? <SpaceIcon type="Espacio común" category={value} /> : <span className="category-picker-placeholder"><Icon name="question-mark" /></span>}
         <span>{value ?? 'Selecciona una categoría'}</span>
-        <span className="category-picker-chevron" aria-hidden="true">⌄</span>
+        <span className="category-picker-chevron" aria-hidden="true"><Icon name="chevron-down" /></span>
       </summary>
       <div className="category-picker-options">
         {spaceCategories.map((category) => (
@@ -38,7 +39,7 @@ function SpaceCategoryPicker({ value, disabled, onChange }: SpaceCategoryPickerP
           >
             <SpaceIcon type="Espacio común" category={category} />
             <span>{category}</span>
-            {value === category && <span className="category-picker-check" aria-hidden="true">✓</span>}
+            {value === category && <span className="category-picker-check" aria-hidden="true"><Icon name="check" /></span>}
           </button>
         ))}
       </div>

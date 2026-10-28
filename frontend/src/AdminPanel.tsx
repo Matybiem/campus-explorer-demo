@@ -8,6 +8,7 @@ import {
   updateAdminSlots,
 } from './adminApi'
 import { fetchFloorPlan } from './api'
+import { Icon } from './icons'
 import SpaceCategoryPicker from './SpaceCategoryPicker'
 import { floorLabel, type AdminSlot, type FloorPlan, type SpaceCategory } from './types'
 
@@ -256,7 +257,7 @@ function AdminPanel({
 
       {!loading && !authenticated && (
         <form className="admin-login-card" onSubmit={handleLogin}>
-          <div className="admin-lock-icon" aria-hidden="true">⌑</div>
+          <div className="admin-lock-icon" aria-hidden="true"><Icon name="lock" /></div>
           <h3>Acceso de administrador</h3>
           <p>Inicia sesión para editar la configuración del plano.</p>
           <label>
@@ -390,7 +391,7 @@ function AdminPanel({
             </article>
           ) : (
             <div className="empty-detail">
-              <span className="empty-detail-icon" aria-hidden="true">⌖</span>
+              <span className="empty-detail-icon" aria-hidden="true"><Icon name="current-location" /></span>
               <h3>Selecciona una casilla</h3>
               <p>Elige cualquier recuadro del mapa, incluso los que están ocultos.</p>
             </div>

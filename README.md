@@ -106,7 +106,7 @@ frontend/
 ## Funcionalidades
 
 - Búsqueda por nombre, código o tipo de espacio.
-- Filtros por categoría y accesibilidad.
+- Filtros por tipo, categoría y accesibilidad desde un panel lateral con botonera («Filtros»).
 - Selección de piso y espacios en el plano o en la lista.
 - Panel con detalles ficticios del espacio seleccionado.
 - Plano interactivo editable como matriz fija de 15 × 15 casillas por nivel; el contorno configurable define la superficie visible del piso sin mostrar casillas ocultas como salas.
@@ -168,11 +168,13 @@ El usuario encuentra espacios por texto y con filtros, en todos los pisos a la v
 
 - **Búsqueda:** el campo de texto busca por nombre, código, tipo o categoría, sin distinguir mayúsculas y minúsculas.
 - **Alcance:** la búsqueda recorre todos los pisos, no solo el seleccionado.
-- **Filtros:** se puede filtrar por tipo (Todos, Sala, Laboratorio, Administrativo o Espacio común) y con la casilla «Accesible».
+- **Filtros:** el botón «Filtros», debajo del campo de búsqueda, abre un panel lateral izquierdo con una botonera de nueve botones: Sala, Laboratorio, Administrativo, Baño hombre, Baño mujer, Escalera, Ascensor, Comida y Accesible. Los botones de tipo y categoría activos se ven a color (con el color e icono de cada uno) y los desactivados en gris. Al abrir el panel están todos activos, de modo que se muestran todos los espacios; al desactivar uno, sus espacios se ocultan. «Accesible» empieza desactivado y, al activarlo, solo se muestran los espacios accesibles.
+- **Panel de filtros:** se cierra con el botón ✕, con la tecla Esc o volviendo a pulsar «Filtros». No oscurece la página, así que el mapa y los resultados se actualizan mientras se eligen los filtros. Incluye el número de resultados y el botón «Restablecer filtros».
+- **Indicador:** el botón «Filtros» muestra una insignia con el número de filtros activos (tipos desactivados más «Accesible»); sin insignia, no hay ninguno.
 - **Resultados:** la lista muestra el icono, el nombre, el tipo y el nivel de cada espacio, junto con el número de resultados.
 - **Ir al espacio:** al elegir un resultado, el mapa cambia al piso del espacio y lo selecciona.
 - **Mapa:** las salas que no coinciden con la búsqueda se atenúan y no se pueden seleccionar.
-- **Sin resultados:** se muestra un aviso con el botón «Limpiar filtros», que borra el texto y los filtros.
+- **Sin resultados:** se muestra un aviso con el botón «Limpiar filtros», que borra el texto y restablece todos los filtros.
 
 ### RF-05 Detalle de un espacio
 

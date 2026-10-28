@@ -473,6 +473,34 @@ h1 {
   font-size: 11px;
 }
 .floor-heading-tools { display: flex; align-items: center; gap: 10px; }
+.stack-toggle {
+  padding: 8px 11px;
+  color: #28649d;
+  background: #f5f9ff;
+  border: 1px solid #d7e5f5;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.stack-toggle:hover, .stack-toggle.is-active { background: #e1efff; border-color: #9cc4ee; }
+.floor-stack { position: relative; transform-style: preserve-3d; transform-origin: center; transition: transform .2s ease; }
+.floor-stack .stack-layer { position: absolute; top: 0; left: 0; }
+.stack-layer .floor-outline .floor-fill { fill: #f6f9fcd9; }
+.stack-layer.is-current .floor-outline .floor-boundary { stroke: #4385c8; }
+.stack-layer-label {
+  position: absolute;
+  z-index: 3;
+  top: -4px;
+  left: 0;
+  padding: 3px 8px;
+  color: #fff;
+  background: #4385c8;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 700;
+  pointer-events: none;
+}
 .floor-admin-controls { display: grid; gap: 5px; }
 .floor-admin-controls > div { display: flex; align-items: center; gap: 4px; }
 .floor-admin-controls span { min-width: 88px; color: #718198; font-size: 9px; text-align: right; }

@@ -11,6 +11,9 @@ const matrixSize = 15
 const mapCellSize = 60
 const mapCanvasPadding = 240
 const slotDragDelayMs = 400
+const stackLayerGap = 45
+const stackSelectedGap = 130
+const stackFit = 1
 const svgCellSize = 100
 
 function getContourPaths(cells: ContourCell[]) {
@@ -62,6 +65,16 @@ function App() {
   const [tilt, setTilt] = useState(defaultView.tilt)
   const [zoom, setZoom] = useState(defaultView.zoom)
   const panRef = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const [stackView, setStackView] = useState(false)
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    viewport.scrollLeft = (viewport.scrollWidth - viewport.clientWidth) / 2
+    viewport.scrollTop = (viewport.scrollHeight - viewport.clientHeight) / 2
+  }, [stackView])
+  const [stackContours, setStackContours] = useState<Record<number, ContourCell[]>>({})
   const swapSlotsRef = useRef<((fromId: string, toId: string) => void) | null>(null)
   const dragTimerRef = useRef<number | null>(null)
   const suppressClickRef = useRef(false)
@@ -147,6 +160,26 @@ function App() {
       cancelled = true
     }
   }, [floor, reloadKey])
+
+  useEffect(() => {
+    if (!stackView) return
+    let cancelled = false
+
+    async function loadStackPlans() {
+      try {
+        const plans = await Promise.all(floors.map((item) => fetchFloorPlan(item.floor)))
+        if (cancelled) return
+        setStackContours(Object.fromEntries(plans.map((plan, index) => [floors[index].floor, plan.contourCells ?? []])))
+      } catch {
+        if (!cancelled) setStackContours({})
+      }
+    }
+
+    void loadStackPlans()
+    return () => {
+      cancelled = true
+    }
+  }, [stackView, floors, reloadKey])
 
   const filteredSpaces = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase('es')
@@ -235,7 +268,16 @@ function App() {
   const { fillPath, outlinePath } = getContourPaths(contourCells)
   const rotationRadians = rotation * Math.PI / 180
   const tiltScale = Math.cos(tilt * Math.PI / 180)
-  const zoomScale = zoom / 100
+  const stackActive = stackView && !adminMapActive
+  const zoomScale = (zoom / 100) * (stackActive ? stackFit : 1)
+  const stackFloors = orderedFloors
+  const selectedStackIndex = stackFloors.findIndex((item) => item.floor === floor)
+  const hasFloorsAbove = selectedStackIndex > 0
+  const stackTotalHeight = Math.max(0, stackFloors.length - 1) * stackLayerGap +
+    (hasFloorsAbove ? stackSelectedGap : 0)
+  const stackExtraHeight = stackActive
+    ? stackTotalHeight * Math.sin(tilt * Math.PI / 180) * zoomScale
+    : 0
   const mapCanvasWidth = Math.ceil(
     (Math.abs(Math.cos(rotationRadians)) * planWidth +
       Math.abs(Math.sin(rotationRadians)) * planHeight * tiltScale) * zoomScale +
@@ -244,6 +286,7 @@ function App() {
   const mapCanvasHeight = Math.ceil(
     (Math.abs(Math.sin(rotationRadians)) * planWidth +
       Math.abs(Math.cos(rotationRadians)) * planHeight * tiltScale) * zoomScale +
+      stackExtraHeight +
       mapCanvasPadding * 2,
   )
 
@@ -327,6 +370,16 @@ function App() {
                   </select>
                   <span aria-hidden="true">⌄</span>
                 </label>
+                {!adminMapActive && (
+                  <button
+                    type="button"
+                    className={`stack-toggle${stackView ? ' is-active' : ''}`}
+                    aria-pressed={stackView}
+                    onClick={() => setStackView((value) => !value)}
+                  >
+                    {stackView ? 'Ver un piso' : 'Ver todos los pisos'}
+                  </button>
+                )}
                 {adminMapActive && (
                   <div className="floor-admin-controls" aria-label="Administrar niveles">
                     <div>
@@ -368,6 +421,7 @@ function App() {
             <div className="map-stage">
               <div
                 className="map-viewport"
+                ref={viewportRef}
                 role="region"
                 aria-label={`Plano de ${floorLabel(floor)}; desplázate para recorrer el mapa completo`}
                 tabIndex={0}
@@ -409,6 +463,70 @@ function App() {
                     height: `${mapCanvasHeight}px`,
                   }}
                 >
+                  {stackActive ? (
+                    <div
+                      className="floor-stack"
+                      style={{
+                        transform: `rotateX(${tilt}deg) rotateZ(${rotation}deg) scale(${zoomScale})`,
+                        width: `${planWidth}px`,
+                        height: `${planHeight}px`,
+                      }}
+                    >
+                      {[...stackFloors].reverse().map((item, index) => {
+                        const layerContour = getContourPaths(stackContours[item.floor] ?? [])
+                        const layerSpaces = spaces.filter((space) => space.floor === item.floor)
+                        const aboveSelected = hasFloorsAbove && index > stackFloors.length - 1 - selectedStackIndex
+                        const offset = index * stackLayerGap +
+                          (aboveSelected ? stackSelectedGap : 0) -
+                          stackTotalHeight / 2
+
+                        return (
+                          <div
+                            key={item.floor}
+                            className={`floor-plan stack-layer${item.floor === floor ? ' is-current' : ''}`}
+                            style={{
+                              transform: `translateZ(${offset}px)`,
+                              width: `${planWidth}px`,
+                              height: `${planHeight}px`,
+                              gridTemplateColumns: `repeat(${floorPlan.horizontalLength}, ${mapCellSize}px)`,
+                              gridTemplateRows: `repeat(${floorPlan.verticalLength}, ${mapCellSize}px)`,
+                            }}
+                          >
+                            <svg
+                              className="floor-outline"
+                              viewBox={`0 0 ${floorPlan.horizontalLength * svgCellSize} ${floorPlan.verticalLength * svgCellSize}`}
+                              aria-hidden="true"
+                            >
+                              <path className="floor-fill" d={layerContour.fillPath} />
+                              <path className="floor-boundary" d={layerContour.outlinePath} />
+                            </svg>
+                            {layerSpaces.map((space) => {
+                              const matchesFilters = filteredSpaceIds.has(space.id)
+                              const displayName = getSpaceLabel(space)
+
+                              return (
+                                <button
+                                  key={space.id}
+                                  type="button"
+                                  className={`map-space ${getSpaceColorClass(space.type, space.category)}${selectedId === space.id ? ' is-selected' : ''}${!matchesFilters ? ' is-muted' : ''}`}
+                                  style={{ gridColumn: space.x + 1, gridRow: space.y + 1 }}
+                                  onClick={() => goToSpace(space)}
+                                  disabled={!matchesFilters}
+                                  aria-pressed={selectedId === space.id}
+                                  aria-label={`${displayName}, ${space.type}, ${floorLabel(item.floor)}`}
+                                  title={`${displayName} · ${floorLabel(item.floor)}`}
+                                >
+                                  <span className="space-symbol"><SpaceIcon type={space.type} category={space.category} /></span>
+                                  <span>{displayName}</span>
+                                </button>
+                              )
+                            })}
+                            <span className="stack-layer-label">{floorLabel(item.floor)}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
                   <div
                     className="floor-plan"
                     style={{
@@ -459,6 +577,7 @@ function App() {
                       <div className="map-empty">No hay espacios cargados para este piso</div>
                     )}
                   </div>
+                  )}
                 </div>
               </div>
               <span className="north-indicator" aria-label="Norte">N <span>↑</span></span>

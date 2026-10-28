@@ -1,12 +1,4 @@
-import type { AdminSlot, SpaceType } from './types'
-
-const spaceTypes: SpaceType[] = [
-  'Sala',
-  'Laboratorio',
-  'Administrativo',
-  'Baño hombre',
-  'Baño mujer',
-]
+import { spaceTypes, type AdminFloorLevels, type AdminSlot } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   let response: Response
@@ -62,13 +54,20 @@ export function getAdminSlots(floor: number) {
   return request<AdminSlot[]>(`/api/admin/slots?floor=${floor}`)
 }
 
-export function updateAdminSlot(
-  id: string,
-  update: Pick<AdminSlot, 'name' | 'type' | 'enabled'>,
-) {
-  return request<AdminSlot>(`/api/admin/slots/${encodeURIComponent(id)}`, {
+export function setAdminFloorActive(floor: number, active: boolean) {
+  return request<AdminFloorLevels>(`/api/admin/floors/${floor}/active`, {
     method: 'PATCH',
-    body: JSON.stringify(update),
+    body: JSON.stringify({ active }),
+  })
+}
+
+export function updateAdminSlots(
+  floor: number,
+  slots: Pick<AdminSlot, 'id' | 'name' | 'type' | 'category' | 'enabled' | 'useContour' | 'accessible' | 'description'>[],
+) {
+  return request<{ slots: AdminSlot[] }>(`/api/admin/floors/${floor}/slots`, {
+    method: 'PATCH',
+    body: JSON.stringify({ slots }),
   })
 }
 

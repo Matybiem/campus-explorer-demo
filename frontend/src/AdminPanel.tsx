@@ -1,19 +1,23 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   getAdminSession,
   getAdminSlots,
   loginAdmin,
   logoutAdmin,
   spaceTypes,
-  updateAdminSlot,
+  updateAdminSlots,
 } from './adminApi'
-import type { AdminSlot, SpaceType } from './types'
+import { fetchFloorPlan } from './api'
+import SpaceCategoryPicker from './SpaceCategoryPicker'
+import { floorLabel, type AdminSlot, type FloorPlan, type SpaceCategory } from './types'
 
 type AdminPanelProps = {
   floor: number
   selectedSlotId: string | null
   onSelectSlot: (id: string) => void
   onSlotsChange: (slots: AdminSlot[] | null) => void
+  onFloorPlanChange: (plan: FloorPlan) => void
+  onPendingChangesChange: (hasChanges: boolean) => void
   onSpacesChanged: () => void
 }
 
@@ -22,14 +26,19 @@ function AdminPanel({
   selectedSlotId,
   onSelectSlot,
   onSlotsChange,
+  onFloorPlanChange,
+  onPendingChangesChange,
   onSpacesChanged,
 }: AdminPanelProps) {
   const [authenticated, setAuthenticated] = useState(false)
   const [slots, setSlots] = useState<AdminSlot[]>([])
+  const [savedSlots, setSavedSlots] = useState<AdminSlot[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const selectedSlotIdRef = useRef(selectedSlotId)
+  selectedSlotIdRef.current = selectedSlotId
 
   useEffect(() => {
     let cancelled = false
@@ -42,14 +51,21 @@ function AdminPanel({
 
         setAuthenticated(sessionState.authenticated)
         if (sessionState.authenticated) {
-          const adminSlots = await getAdminSlots(floor)
+          const [loadedSlots, floorPlan] = await Promise.all([
+            getAdminSlots(floor),
+            fetchFloorPlan(floor),
+          ])
           if (!cancelled) {
-            setSlots(adminSlots)
-            onSlotsChange(adminSlots)
-            if (adminSlots[0]) onSelectSlot(adminSlots[0].id)
+            setSlots(loadedSlots)
+            setSavedSlots(loadedSlots)
+            onSlotsChange(loadedSlots)
+            onFloorPlanChange(floorPlan)
+            const selectedSlot = loadedSlots.find((slot) => slot.id === selectedSlotIdRef.current)
+            if (selectedSlot ?? loadedSlots[0]) onSelectSlot((selectedSlot ?? loadedSlots[0]).id)
           }
         } else {
           setSlots([])
+          setSavedSlots([])
           onSlotsChange(null)
         }
       } catch (loadError) {
@@ -57,6 +73,7 @@ function AdminPanel({
           setAuthenticated(false)
           setError(loadError instanceof Error ? loadError.message : 'No se pudo consultar la sesión.')
           setSlots([])
+          setSavedSlots([])
           onSlotsChange(null)
         }
       } finally {
@@ -68,7 +85,7 @@ function AdminPanel({
     return () => {
       cancelled = true
     }
-  }, [floor, onSlotsChange])
+  }, [floor, onFloorPlanChange, onSelectSlot, onSlotsChange])
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -82,10 +99,15 @@ function AdminPanel({
 
     try {
       await loginAdmin(loginUsername, password)
-      const adminSlots = await getAdminSlots(floor)
+      const [adminSlots, floorPlan] = await Promise.all([
+        getAdminSlots(floor),
+        fetchFloorPlan(floor),
+      ])
       setAuthenticated(true)
       setSlots(adminSlots)
+      setSavedSlots(adminSlots)
       onSlotsChange(adminSlots)
+      onFloorPlanChange(floorPlan)
       if (adminSlots[0]) onSelectSlot(adminSlots[0].id)
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'No se pudo iniciar sesión.')
@@ -101,39 +123,68 @@ function AdminPanel({
       await logoutAdmin()
       setAuthenticated(false)
       setSlots([])
+      setSavedSlots([])
       onSlotsChange(null)
     } catch (logoutError) {
       setError(logoutError instanceof Error ? logoutError.message : 'No se pudo cerrar sesión.')
     }
   }
 
-  function updateDraft(id: string, changes: Partial<Pick<AdminSlot, 'name' | 'type' | 'enabled'>>) {
+  function updateDraft(
+    id: string,
+    changes: Partial<Pick<AdminSlot, 'name' | 'type' | 'category' | 'enabled' | 'useContour' | 'accessible' | 'description'>>,
+  ) {
     const updated = slots.map((slot) => slot.id === id ? { ...slot, ...changes } : slot)
     setSlots(updated)
     onSlotsChange(updated)
     setNotice(null)
   }
 
-  async function saveSlot(slot: AdminSlot) {
+  const savedSlotsById = new Map(savedSlots.map((slot) => [slot.id, slot]))
+  const pendingSlots = slots.filter((slot) => {
+    const savedSlot = savedSlotsById.get(slot.id)
+    return !savedSlot ||
+      slot.name !== savedSlot.name ||
+      slot.type !== savedSlot.type ||
+      slot.category !== savedSlot.category ||
+      slot.enabled !== savedSlot.enabled ||
+      slot.useContour !== savedSlot.useContour ||
+      slot.accessible !== savedSlot.accessible ||
+      slot.description !== savedSlot.description
+  })
+
+  useEffect(() => {
+    onPendingChangesChange(pendingSlots.length > 0)
+  }, [onPendingChangesChange, pendingSlots.length])
+
+  async function saveAllSlots() {
+    if (pendingSlots.length === 0) return
     setBusy(true)
     setError(null)
     setNotice(null)
 
     try {
-      const savedSlot = await updateAdminSlot(slot.id, {
+      const result = await updateAdminSlots(floor, pendingSlots.map((slot) => ({
+        id: slot.id,
         name: slot.name,
         type: slot.type,
+        category: slot.category,
         enabled: slot.enabled,
-      })
-      const updatedSlots = slots.map((currentSlot) => (
-        currentSlot.id === savedSlot.id ? savedSlot : currentSlot
-      ))
-      setSlots(updatedSlots)
-      onSlotsChange(updatedSlots)
-      setNotice(`${savedSlot.name} guardado correctamente.`)
+        useContour: slot.useContour,
+        accessible: slot.accessible,
+        description: slot.description,
+      })))
+      setSlots(result.slots)
+      setSavedSlots(result.slots)
+      onSlotsChange(result.slots)
+      setNotice(
+        pendingSlots.length === 1
+          ? 'Se guardó 1 cambio correctamente.'
+          : `Se guardaron ${pendingSlots.length} cambios correctamente.`,
+      )
       onSpacesChanged()
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'No se pudo guardar la casilla.')
+      setError(saveError instanceof Error ? saveError.message : 'No se pudieron guardar los cambios.')
     } finally {
       setBusy(false)
     }
@@ -146,14 +197,15 @@ function AdminPanel({
       <div className="side-card-heading">
         <div>
           <h2 id="admin-heading">Administrar espacios</h2>
-          <p>Selecciona una casilla en el mapa para editarla.</p>
+          <p>Los cambios del piso se guardan juntos.</p>
         </div>
         {authenticated && (
           <button
             type="button"
             className="admin-logout-button"
             onClick={() => void handleLogout()}
-            disabled={busy}
+            disabled={busy || pendingSlots.length > 0}
+            title={pendingSlots.length > 0 ? 'Guarda los cambios pendientes antes de salir.' : undefined}
           >
             Salir
           </button>
@@ -193,7 +245,20 @@ function AdminPanel({
       {!loading && authenticated && (
         <div className="admin-editor">
           <div className="admin-toolbar">
-            <span>{slots.filter((slot) => slot.enabled).length} de {slots.length} casillas activas</span>
+            <span>
+              {slots.filter((slot) => slot.enabled).length} de {slots.length} casillas activas
+              {pendingSlots.length > 0 && ` · ${pendingSlots.length} cambios pendientes`}
+            </span>
+            <button
+              type="button"
+              className="admin-save-button"
+              disabled={busy || pendingSlots.length === 0}
+              onClick={() => void saveAllSlots()}
+            >
+              {busy ? 'Guardando…' : pendingSlots.length > 0
+                ? `Guardar cambios (${pendingSlots.length})`
+                : 'Todo guardado'}
+            </button>
           </div>
           {selectedSlot ? (
             <article className={`admin-slot-card${selectedSlot.enabled ? ' is-enabled' : ''}`}>
@@ -203,7 +268,11 @@ function AdminPanel({
                   <input
                     type="checkbox"
                     checked={selectedSlot.enabled}
-                    onChange={(event) => updateDraft(selectedSlot.id, { enabled: event.target.checked })}
+                    disabled={busy}
+                    onChange={(event) => updateDraft(selectedSlot.id, {
+                      enabled: event.target.checked,
+                      ...(event.target.checked ? { useContour: true } : {}),
+                    })}
                     aria-label={`Mostrar ${selectedSlot.name || selectedSlot.id} en el mapa`}
                   />
                   <span className="toggle-track" aria-hidden="true" />
@@ -211,35 +280,76 @@ function AdminPanel({
                 </label>
               </div>
               <label className="admin-field">
-                Nombre
-                <input
-                  value={selectedSlot.name}
-                  onChange={(event) => updateDraft(selectedSlot.id, { name: event.target.value })}
-                  placeholder="Nombre del espacio"
-                  maxLength={60}
-                />
-              </label>
-              <label className="admin-field">
                 Tipo de espacio
                 <select
                   value={selectedSlot.type}
+                  disabled={busy}
                   onChange={(event) => {
-                    const type: SpaceType | undefined = spaceTypes.find((item) => item === event.target.value)
-                    if (type) updateDraft(selectedSlot.id, { type })
+                    const type = spaceTypes.find((item) => item === event.target.value)
+                    if (type) {
+                      updateDraft(selectedSlot.id, {
+                        type,
+                        ...(type === 'Espacio común' ? { name: '', category: null } : { category: null }),
+                      })
+                    }
                   }}
                 >
                   {spaceTypes.map((type) => <option key={type}>{type}</option>)}
                 </select>
               </label>
-              <p className="admin-slot-coordinate">Piso {selectedSlot.floor} · {selectedSlot.id}</p>
-              <button
-                type="button"
-                className="admin-save-button"
-                disabled={busy || selectedSlot.name.trim().length < 2}
-                onClick={() => void saveSlot(selectedSlot)}
-              >
-                {busy ? 'Guardando…' : 'Guardar cambios'}
-              </button>
+              {selectedSlot.type === 'Espacio común' ? (
+                <div className="admin-field">
+                  <span>Categoría</span>
+                  <SpaceCategoryPicker
+                    value={selectedSlot.category}
+                    disabled={busy}
+                    onChange={(category: SpaceCategory) => updateDraft(selectedSlot.id, { category })}
+                  />
+                </div>
+              ) : (
+                <label className="admin-field">
+                  Nombre
+                  <input
+                    value={selectedSlot.name}
+                    disabled={busy}
+                    onChange={(event) => updateDraft(selectedSlot.id, { name: event.target.value })}
+                    placeholder="Opcional; se mostrará el código si queda vacío"
+                    maxLength={60}
+                  />
+                </label>
+              )}
+              <div className="admin-slot-options">
+                <label className="admin-accessibility-toggle">
+                  <input
+                    type="checkbox"
+                    checked={selectedSlot.accessible}
+                    disabled={busy}
+                    onChange={(event) => updateDraft(selectedSlot.id, { accessible: event.target.checked })}
+                  />
+                  Espacio accesible
+                </label>
+                <label className="admin-accessibility-toggle">
+                  <input
+                    type="checkbox"
+                    checked={selectedSlot.enabled || selectedSlot.useContour}
+                    disabled={busy || selectedSlot.enabled}
+                    onChange={(event) => updateDraft(selectedSlot.id, { useContour: event.target.checked })}
+                  />
+                  Usar contorno
+                </label>
+              </div>
+              <label className="admin-field">
+                Descripción
+                <textarea
+                  value={selectedSlot.description}
+                  disabled={busy}
+                  onChange={(event) => updateDraft(selectedSlot.id, { description: event.target.value })}
+                  placeholder="Descripción opcional del espacio"
+                  maxLength={500}
+                  rows={3}
+                />
+              </label>
+              <p className="admin-slot-coordinate">{floorLabel(selectedSlot.floor)} · {selectedSlot.id}</p>
             </article>
           ) : (
             <div className="empty-detail">

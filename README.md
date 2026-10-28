@@ -122,6 +122,129 @@ frontend/
 
 El plano actual es un esquema CSS interactivo, no un modelo arquitectónico ni un visor 3D.
 
+## Requerimientos funcionales
+
+Cada requerimiento describe qué puede hacer la aplicación y las reglas que cumple. Los valores configurables se indican con el nombre de su constante en `frontend/src/App.tsx`.
+
+### RF-01 Consulta del mapa por piso
+
+El mapa muestra los espacios de un piso sobre una cuadrícula fija, con la superficie del piso y sus paredes.
+
+- **Cuadrícula fija:** cada piso es una matriz de 15 × 15 casillas. Solo las casillas visibles se muestran como salas.
+- **Contorno:** la superficie del piso se dibuja con las casillas visibles y con las ocultas marcadas con «Usar contorno».
+- **Paredes:** se levantan en cada borde exterior del contorno, con una altura igual al ancho de una casilla (`wallHeight`). Son translúcidas, así que las salas se siguen viendo, y no interceptan los clics.
+- **Selector de nivel:** lista solo los niveles activos, de arriba hacia abajo: Piso 4, Piso 3, Piso 2, Piso 1, Subterráneo 1, Subterráneo 2.
+- **Selección:** un clic sobre una sala la resalta y muestra su detalle.
+- **Tipos y categorías:** cada tipo de espacio y cada categoría de espacio común tiene su propio color e icono.
+
+### RF-02 Navegación del mapa
+
+El usuario controla la cámara del mapa con el ratón o con los controles de la parte inferior.
+
+- **Rotación e inclinación:** los deslizadores rotan el plano entre -180° y 180° y lo inclinan entre 0° y 90°.
+- **Zoom:** el zoom queda entre 20 % y 140 % (`minZoom` y `maxZoom`). Se ajusta con el deslizador, con los botones + y − (10 puntos por pulsación) y con la rueda del ratón sobre el mapa (5 puntos por «clic», con `wheelZoomPerPixel`).
+- **Rueda del ratón:** la rueda sobre el mapa cambia el zoom en lugar de desplazarlo. Fuera del mapa, la página se desplaza como siempre.
+- **Orbitar:** al mantener el clic izquierdo y mover el ratón más de 5 px (`orbitThresholdPx`), el movimiento horizontal cambia la rotación y el vertical la inclinación (hacia arriba inclina más). Un clic sin movimiento selecciona la sala.
+- **Mover el mapa:** con el clic derecho sostenido el plano se arrastra como una mano. También se puede mover con las barras de desplazamiento. Sobre el mapa no aparece el menú contextual del navegador.
+- **Vistas predefinidas:** «Restablecer vista» vuelve a la vista inclinada inicial (`defaultView`) y «Vista plana» muestra el mapa desde arriba (`flatView`).
+- **Margen:** el plano queda rodeado de un margen amplio (`mapCanvasPadding`) para poder moverlo sin que toque el borde.
+
+### RF-03 Vista de todos los pisos
+
+El botón «Ver todos los pisos» muestra todos los niveles activos apilados en el eje Z.
+
+- **Planos alineados:** cada piso es un plano de 15 × 15 con el mismo origen, así que la casilla (x, y) de un piso queda sobre la (x, y) del piso de abajo.
+- **Orden:** el piso más alto va arriba y cada plano lleva una etiqueta con su nombre.
+- **Separación:** la distancia entre pisos es igual a la altura de las paredes (`stackLayerGap`), de modo que cada pared llega justo al piso de arriba. El piso seleccionado queda más separado del que tiene encima (`stackSelectedGap`).
+- **Paredes:** cada piso dibuja las paredes de su propio contorno.
+- **Selección:** un clic sobre una sala la selecciona y cambia al piso al que pertenece.
+- **Controles:** la rotación, la inclinación y el zoom funcionan igual que en la vista de un piso.
+- **Administración:** el botón se oculta en modo administración, que siempre edita un solo piso.
+
+### RF-04 Búsqueda y filtros
+
+El usuario encuentra espacios por texto y con filtros, en todos los pisos a la vez.
+
+- **Búsqueda:** el campo de texto busca por nombre, código, tipo o categoría, sin distinguir mayúsculas y minúsculas.
+- **Alcance:** la búsqueda recorre todos los pisos, no solo el seleccionado.
+- **Filtros:** se puede filtrar por tipo (Todos, Sala, Laboratorio, Administrativo o Espacio común) y con la casilla «Accesible».
+- **Resultados:** la lista muestra el icono, el nombre, el tipo y el nivel de cada espacio, junto con el número de resultados.
+- **Ir al espacio:** al elegir un resultado, el mapa cambia al piso del espacio y lo selecciona.
+- **Mapa:** las salas que no coinciden con la búsqueda se atenúan y no se pueden seleccionar.
+- **Sin resultados:** se muestra un aviso con el botón «Limpiar filtros», que borra el texto y los filtros.
+
+### RF-05 Detalle de un espacio
+
+Al seleccionar un espacio, el panel lateral muestra su información.
+
+- **Encabezado:** una etiqueta con el tipo, con su icono y color (para un espacio común incluye la categoría), y el nombre del espacio. Si no tiene nombre, se muestra su código.
+- **Datos:** código, piso y capacidad referencial (solo si existe).
+- **Accesibilidad:** indica «Accesible» o «No indicada».
+- **Descripción:** se muestra entre la accesibilidad y la nota de información ficticia.
+- **Ver en el mapa:** el botón «Ver … en el mapa» cambia al piso del espacio y lo selecciona.
+
+### RF-06 Acceso del administrador
+
+La edición del mapa requiere iniciar sesión como administrador.
+
+- **Inicio de sesión:** el botón «Administrar» abre el panel con usuario (hasta 40 caracteres) y contraseña (hasta 72).
+- **Sesión:** la sesión se guarda en una cookie `HttpOnly` y dura 8 horas. El botón «Salir» la cierra.
+- **Intentos:** se permiten 8 intentos de inicio de sesión cada 15 minutos.
+- **Contraseñas:** se guardan con hash bcrypt y nunca se envían al frontend.
+- **Rutas protegidas:** todas las rutas de edición exigen sesión. Sin ella responden con el estado `401`.
+- **Cerrar la administración:** los botones «Cerrar administración» y «Salir» se bloquean mientras haya cambios sin guardar.
+
+### RF-07 Edición de casillas
+
+El administrador edita cualquiera de las 225 casillas del piso, incluidas las ocultas.
+
+- **Mapa de edición:** muestra todas las casillas del piso. Las ocultas aparecen en gris.
+- **Visibilidad:** el interruptor «Visible» o «Oculta» decide si la casilla se muestra como sala en el mapa público.
+- **Tipo:** se elige primero el tipo: Sala, Laboratorio, Administrativo o Espacio común.
+- **Nombre:** es opcional y admite hasta 60 caracteres. Si queda vacío, se muestra el código de la casilla.
+- **Categoría:** para un Espacio común, el nombre se reemplaza por una categoría obligatoria: Baño hombre, Baño mujer, Escalera, Ascensor o Comida. Cada una se elige en un desplegable con su icono y color.
+- **Accesibilidad:** la casilla «Espacio accesible» marca si el espacio es accesible.
+- **Usar contorno:** decide si una casilla oculta forma parte de la superficie del piso. Mientras la casilla es visible, esta opción queda marcada y no se puede desmarcar. Se conserva al ocultarla.
+- **Descripción:** texto opcional de hasta 500 caracteres.
+
+### RF-08 Guardado de cambios
+
+Los cambios se acumulan y se guardan todos juntos.
+
+- **Cambios pendientes:** cada edición queda pendiente. El botón «Guardar cambios (N)» muestra cuántas casillas se modificaron.
+- **Guardado conjunto:** el botón guarda todas las casillas modificadas del piso en una sola petición, hasta 225.
+- **Consistencia:** el guardado es una transacción. Si algo falla, no se guarda ninguna casilla.
+- **Bloqueo:** con cambios pendientes no se puede cambiar de piso, cerrar la administración ni modificar los niveles.
+- **Confirmación:** al terminar se informa cuántos cambios se guardaron.
+
+### RF-09 Gestión de niveles
+
+El administrador agrega y desactiva pisos y subterráneos.
+
+- **Límites:** hasta 10 pisos y 5 subterráneos. Los contadores muestran cuántos hay activos.
+- **Orden:** los botones «＋ Piso» y «＋ Subterráneo» activan el siguiente nivel de su secuencia, sin dejar huecos.
+- **Desactivar:** el botón «−» desactiva solo el último nivel de cada secuencia. El Piso 1 no se puede desactivar.
+- **Datos conservados:** un nivel desactivado desaparece del selector y del mapa público, pero conserva sus casillas para poder reactivarlo.
+- **Bloqueo:** los botones se deshabilitan mientras hay cambios pendientes.
+
+### RF-10 Intercambio de casillas
+
+El administrador reubica el contenido de una casilla arrastrándola.
+
+- **Gesto:** mantener presionado el clic izquierdo sobre una casilla sin moverse durante 0,4 s (`slotDragDelayMs`) y soltarla sobre otra.
+- **Resultado:** las dos casillas intercambian su contenido (visibilidad, tipo, nombre, categoría, accesibilidad, contorno y descripción). Sus posiciones no cambian.
+- **Pendiente:** el intercambio queda como un cambio pendiente y se guarda con el resto.
+- **Orbitar:** si el cursor se mueve antes de los 0,4 s, el gesto gira el mapa en lugar de intercambiar.
+- **Resaltado:** la casilla de origen se atenúa y la de destino se resalta mientras se arrastra.
+
+### RF-11 Estado de la conexión
+
+La aplicación informa cuando carga los datos o cuando falla la conexión.
+
+- **Carga:** mientras se piden los espacios se muestra el mensaje «Cargando espacios de demostración…».
+- **Error:** si la API no responde o devuelve un formato inválido, se muestra el motivo y un botón «Reintentar».
+- **Datos reales:** la aplicación no muestra datos inventados como si la API hubiera respondido.
+
 ## Arquitectura y flujo de datos
 
 1. La interfaz solicita `GET /api/spaces` desde `frontend/src/api.ts`.

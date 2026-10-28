@@ -8,6 +8,8 @@ type FiltersPanelProps = {
   triggerRef: RefObject<HTMLElement | null>
   showWalls: boolean
   onToggleWalls: () => void
+  showGrass: boolean
+  onToggleGrass: () => void
   activeKinds: ReadonlySet<string>
   accessibleOnly: boolean
   resultCount: number
@@ -22,6 +24,8 @@ function FiltersPanel({
   triggerRef,
   showWalls,
   onToggleWalls,
+  showGrass,
+  onToggleGrass,
   activeKinds,
   accessibleOnly,
   resultCount,
@@ -105,6 +109,15 @@ function FiltersPanel({
         >
           <Icon name="wall" />
           <span>Paredes</span>
+        </button>
+        <button
+          type="button"
+          className={`filter-tile filter-tile-grass${showGrass ? ' is-on' : ''}`}
+          aria-pressed={showGrass}
+          onClick={onToggleGrass}
+        >
+          <Icon name="leaf" />
+          <span>Pasto</span>
         </button>
       </div>
 

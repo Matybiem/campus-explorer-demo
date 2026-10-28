@@ -231,6 +231,7 @@ h1 {
 .filter-tile > .icon { width: 30px; height: 30px; }
 .filter-tile-accessible { color: #1768d2; background: #e3efff; border-color: #1768d2; }
 .filter-tile-walls { color: #9a4a2f; background: #fbe6dd; border-color: #c8704f; }
+.filter-tile-grass { color: #4d7c0f; background: #eaf7d3; border-color: #8bc34a; }
 .filter-tile:not(.is-on) { color: #8b9199; background: #ededed; border-color: #d4d4d4; }
 .filter-tile:focus-visible, .filters-close:focus-visible, .filters-button:focus-visible {
   outline: 2px solid #4385c8;
@@ -685,6 +686,21 @@ h1 {
   inset: 0;
   transform-style: preserve-3d;
   pointer-events: none;
+}
+.floor-grass {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.floor-grass path {
+  fill: #5dbb63a6;
+  stroke: #3e9a4a;
+  stroke-opacity: .45;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 .floor-wall {
   position: absolute;

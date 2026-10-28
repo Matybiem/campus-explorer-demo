@@ -517,6 +517,8 @@ h1 {
   scrollbar-color: #aebdcb #e7f7fc;
   scrollbar-width: thin;
 }
+.map-space.is-drag-source { opacity: .55; cursor: grabbing; outline: 2px dashed #2f6fce; }
+.map-space.is-drag-target { outline: 3px solid #2f6fce; transform: translateZ(8px) scale(1.06); }
 .map-viewport.is-panning,
 .map-viewport.is-panning * {
   cursor: grabbing;

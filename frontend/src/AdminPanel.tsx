@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type MutableRefObject } from 'react'
 import {
   getAdminSession,
   getAdminSlots,
@@ -19,6 +19,7 @@ type AdminPanelProps = {
   onFloorPlanChange: (plan: FloorPlan) => void
   onPendingChangesChange: (hasChanges: boolean) => void
   onSpacesChanged: () => void
+  swapRef?: MutableRefObject<((fromId: string, toId: string) => void) | null>
 }
 
 function AdminPanel({
@@ -29,6 +30,7 @@ function AdminPanel({
   onFloorPlanChange,
   onPendingChangesChange,
   onSpacesChanged,
+  swapRef,
 }: AdminPanelProps) {
   const [authenticated, setAuthenticated] = useState(false)
   const [slots, setSlots] = useState<AdminSlot[]>([])
@@ -139,6 +141,41 @@ function AdminPanel({
     onSlotsChange(updated)
     setNotice(null)
   }
+
+  function pickContent(slot: AdminSlot) {
+    return {
+      name: slot.name,
+      type: slot.type,
+      category: slot.category,
+      enabled: slot.enabled,
+      useContour: slot.useContour,
+      accessible: slot.accessible,
+      description: slot.description,
+    }
+  }
+
+  useEffect(() => {
+    if (!swapRef) return
+    swapRef.current = (fromId, toId) => {
+      const from = slots.find((slot) => slot.id === fromId)
+      const to = slots.find((slot) => slot.id === toId)
+      if (!from || !to || busy) return
+      const fromContent = pickContent(from)
+      const toContent = pickContent(to)
+      const updated = slots.map((slot) => {
+        if (slot.id === fromId) return { ...slot, ...toContent }
+        if (slot.id === toId) return { ...slot, ...fromContent }
+        return slot
+      })
+      setSlots(updated)
+      onSlotsChange(updated)
+      setNotice(null)
+      onSelectSlot(toId)
+    }
+    return () => {
+      swapRef.current = null
+    }
+  })
 
   const savedSlotsById = new Map(savedSlots.map((slot) => [slot.id, slot]))
   const pendingSlots = slots.filter((slot) => {

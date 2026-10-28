@@ -77,7 +77,7 @@ function FiltersPanel({
           aria-pressed={accessibleOnly}
           onClick={onToggleAccessible}
         >
-          <Icon name="wheelchair" />
+          <Icon name="hand-stop" />
           <span>Accesible</span>
         </button>
       </div>

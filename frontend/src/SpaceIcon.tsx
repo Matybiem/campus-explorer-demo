@@ -8,7 +8,7 @@ type SpaceIconProps = {
 
 const typeIcons: Record<Exclude<SpaceType, 'Espacio común'>, IconName> = {
   Sala: 'chalkboard',
-  Laboratorio: 'flask',
+  Laboratorio: 'device-desktop',
   Administrativo: 'briefcase',
 }
 

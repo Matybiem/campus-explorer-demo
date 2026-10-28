@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import AdminPanel from './AdminPanel'
 import SpaceIcon from './SpaceIcon'
 import { fetchFloorPlan, fetchFloors, fetchSpaces } from './api'
@@ -10,6 +10,7 @@ const flatView = { rotation: 0, tilt: 0, zoom: 55 }
 const matrixSize = 15
 const mapCellSize = 60
 const mapCanvasPadding = 240
+const slotDragDelayMs = 400
 const svgCellSize = 100
 
 function getContourPaths(cells: ContourCell[]) {
@@ -61,6 +62,58 @@ function App() {
   const [tilt, setTilt] = useState(defaultView.tilt)
   const [zoom, setZoom] = useState(defaultView.zoom)
   const panRef = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
+  const swapSlotsRef = useRef<((fromId: string, toId: string) => void) | null>(null)
+  const dragTimerRef = useRef<number | null>(null)
+  const suppressClickRef = useRef(false)
+  const [dragSourceId, setDragSourceId] = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
+
+  function cancelDragTimer() {
+    if (dragTimerRef.current !== null) {
+      window.clearTimeout(dragTimerRef.current)
+      dragTimerRef.current = null
+    }
+  }
+
+  function slotIdAtPoint(x: number, y: number) {
+    const element = document.elementFromPoint(x, y)
+    return element?.closest<HTMLElement>('[data-slot-id]')?.dataset.slotId ?? null
+  }
+
+  function startSlotDrag(event: ReactPointerEvent<HTMLButtonElement>, id: string) {
+    if (event.button !== 0 || !adminMapActive) return
+    cancelDragTimer()
+
+    const cleanup = () => {
+      cancelDragTimer()
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleCancel)
+      window.removeEventListener('pointermove', handleMove)
+      setDragSourceId(null)
+      setDragOverId(null)
+    }
+    const handleMove = (moveEvent: PointerEvent) => {
+      if (dragTimerRef.current === null) setDragOverId(slotIdAtPoint(moveEvent.clientX, moveEvent.clientY))
+    }
+    const handleUp = (upEvent: PointerEvent) => {
+      const dragging = dragTimerRef.current === null
+      const targetId = slotIdAtPoint(upEvent.clientX, upEvent.clientY)
+      cleanup()
+      if (!dragging) return
+      suppressClickRef.current = true
+      window.setTimeout(() => { suppressClickRef.current = false }, 0)
+      if (targetId && targetId !== id) swapSlotsRef.current?.(id, targetId)
+    }
+    const handleCancel = () => cleanup()
+
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleCancel)
+    window.addEventListener('pointermove', handleMove)
+    dragTimerRef.current = window.setTimeout(() => {
+      dragTimerRef.current = null
+      setDragSourceId(id)
+    }, slotDragDelayMs)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -384,9 +437,14 @@ function App() {
                         <button
                           key={space.id}
                           type="button"
-                          className={`map-space ${getSpaceColorClass(space.type, space.category)}${hiddenInAdmin ? ' is-hidden' : ''}${selectedId === space.id ? ' is-selected' : ''}${!adminMapActive && !matchesFilters ? ' is-muted' : ''}`}
+                          className={`map-space ${getSpaceColorClass(space.type, space.category)}${hiddenInAdmin ? ' is-hidden' : ''}${selectedId === space.id ? ' is-selected' : ''}${!adminMapActive && !matchesFilters ? ' is-muted' : ''}${dragSourceId === space.id ? ' is-drag-source' : ''}${dragSourceId && dragOverId === space.id && dragOverId !== dragSourceId ? ' is-drag-target' : ''}`}
                           style={{ gridColumn: space.x + 1, gridRow: space.y + 1 }}
-                          onClick={() => setSelectedId(space.id)}
+                          data-slot-id={space.id}
+                          onPointerDown={(event) => startSlotDrag(event, space.id)}
+                          onClick={() => {
+                            if (suppressClickRef.current) return
+                            setSelectedId(space.id)
+                          }}
                           disabled={!adminMapActive && !matchesFilters}
                           aria-pressed={selectedId === space.id}
                           aria-label={`${displayName}, ${space.type}${hiddenInAdmin ? ', oculta' : ''}`}
@@ -474,6 +532,7 @@ function App() {
                 onSlotsChange={updateAdminSlots}
                 onFloorPlanChange={updateFloorPlan}
                 onPendingChangesChange={updatePendingAdminChanges}
+                swapRef={swapSlotsRef}
                 onSpacesChanged={() => setReloadKey((key) => key + 1)}
               />
             ) : <section className="detail-card" aria-live="polite">

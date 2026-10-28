@@ -12,6 +12,8 @@ const mapCellSize = 60
 const wallHeight = mapCellSize
 const mapCanvasPadding = 240
 const slotDragDelayMs = 400
+const orbitThresholdPx = 5
+const orbitDegreesPerPixel = 0.4
 const stackLayerGap = wallHeight
 const stackSelectedGap = 130
 const stackFit = 1
@@ -143,6 +145,8 @@ function App() {
   const [tilt, setTilt] = useState(defaultView.tilt)
   const [zoom, setZoom] = useState(defaultView.zoom)
   const panRef = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
+  const orbitRef = useRef<{ x: number; y: number; rotation: number; tilt: number; active: boolean } | null>(null)
+  const orbitedRef = useRef(false)
   const viewportRef = useRef<HTMLDivElement>(null)
   const [stackView, setStackView] = useState(false)
 
@@ -184,10 +188,10 @@ function App() {
       setDragOverId(null)
     }
     const handleMove = (moveEvent: PointerEvent) => {
-      if (dragTimerRef.current === null) setDragOverId(slotIdAtPoint(moveEvent.clientX, moveEvent.clientY))
+      if (dragTimerRef.current === null && !orbitedRef.current) setDragOverId(slotIdAtPoint(moveEvent.clientX, moveEvent.clientY))
     }
     const handleUp = (upEvent: PointerEvent) => {
-      const dragging = dragTimerRef.current === null
+      const dragging = dragTimerRef.current === null && !orbitedRef.current
       const targetId = slotIdAtPoint(upEvent.clientX, upEvent.clientY)
       cleanup()
       if (!dragging) return
@@ -506,9 +510,24 @@ function App() {
                 tabIndex={0}
                 onContextMenu={(event) => event.preventDefault()}
                 onPointerDown={(event) => {
+                  const viewport = event.currentTarget
+                  if (event.button === 0) {
+                    const bounds = viewport.getBoundingClientRect()
+                    const onScrollbar = event.clientX - bounds.left >= viewport.clientWidth ||
+                      event.clientY - bounds.top >= viewport.clientHeight
+                    if (onScrollbar) return
+                    orbitedRef.current = false
+                    orbitRef.current = {
+                      x: event.clientX,
+                      y: event.clientY,
+                      rotation,
+                      tilt,
+                      active: false,
+                    }
+                    return
+                  }
                   if (event.button !== 2) return
                   event.preventDefault()
-                  const viewport = event.currentTarget
                   panRef.current = {
                     x: event.clientX,
                     y: event.clientY,
@@ -519,20 +538,49 @@ function App() {
                   viewport.classList.add('is-panning')
                 }}
                 onPointerMove={(event) => {
+                  const orbit = orbitRef.current
+                  if (orbit && !dragSourceId) {
+                    const deltaX = event.clientX - orbit.x
+                    const deltaY = event.clientY - orbit.y
+                    if (!orbit.active && Math.hypot(deltaX, deltaY) > orbitThresholdPx) {
+                      orbit.active = true
+                      orbitedRef.current = true
+                      cancelDragTimer()
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                      event.currentTarget.classList.add('is-orbiting')
+                    }
+                    if (orbit.active) {
+                      setRotation(Math.max(-180, Math.min(180, Math.round(orbit.rotation + deltaX * orbitDegreesPerPixel))))
+                      setTilt(Math.max(0, Math.min(90, Math.round(orbit.tilt - deltaY * orbitDegreesPerPixel))))
+                      return
+                    }
+                  }
                   const pan = panRef.current
                   if (!pan) return
                   event.currentTarget.scrollLeft = pan.left - (event.clientX - pan.x)
                   event.currentTarget.scrollTop = pan.top - (event.clientY - pan.y)
                 }}
                 onPointerUp={(event) => {
+                  const orbit = orbitRef.current
+                  if (event.button === 0 && orbit) {
+                    orbitRef.current = null
+                    if (orbit.active) {
+                      suppressClickRef.current = true
+                      window.setTimeout(() => { suppressClickRef.current = false }, 0)
+                      event.currentTarget.classList.remove('is-orbiting')
+                      event.currentTarget.releasePointerCapture(event.pointerId)
+                    }
+                    return
+                  }
                   if (event.button !== 2 || !panRef.current) return
                   panRef.current = null
                   event.currentTarget.classList.remove('is-panning')
                   event.currentTarget.releasePointerCapture(event.pointerId)
                 }}
                 onPointerCancel={(event) => {
+                  orbitRef.current = null
                   panRef.current = null
-                  event.currentTarget.classList.remove('is-panning')
+                  event.currentTarget.classList.remove('is-panning', 'is-orbiting')
                 }}
               >
                 <div
@@ -590,7 +638,10 @@ function App() {
                                   type="button"
                                   className={`map-space ${getSpaceColorClass(space.type, space.category)}${selectedId === space.id ? ' is-selected' : ''}${!matchesFilters ? ' is-muted' : ''}`}
                                   style={{ gridColumn: space.x + 1, gridRow: space.y + 1 }}
-                                  onClick={() => goToSpace(space)}
+                                  onClick={() => {
+                                    if (suppressClickRef.current) return
+                                    goToSpace(space)
+                                  }}
                                   disabled={!matchesFilters}
                                   aria-pressed={selectedId === space.id}
                                   aria-label={`${displayName}, ${space.type}, ${floorLabel(item.floor)}`}

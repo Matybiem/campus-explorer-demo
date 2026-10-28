@@ -548,9 +548,15 @@ h1 {
 .map-space.is-drag-source { opacity: .55; cursor: grabbing; outline: 2px dashed #2f6fce; }
 .map-space.is-drag-target { outline: 3px solid #2f6fce; transform: translateZ(8px) scale(1.06); }
 .map-viewport.is-panning,
-.map-viewport.is-panning * {
+.map-viewport.is-panning *,
+.map-viewport.is-orbiting,
+.map-viewport.is-orbiting * {
   cursor: grabbing;
   user-select: none;
+}
+.map-viewport.is-orbiting .floor-plan,
+.map-viewport.is-orbiting .floor-stack {
+  transition: none;
 }
 .map-viewport:focus-visible {
   outline: 2px solid #4385c8;

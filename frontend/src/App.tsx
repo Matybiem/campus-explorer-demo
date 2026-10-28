@@ -12,7 +12,7 @@ const mapCellSize = 60
 const wallHeight = mapCellSize
 const mapCanvasPadding = 240
 const slotDragDelayMs = 400
-const stackLayerGap = 45
+const stackLayerGap = wallHeight
 const stackSelectedGap = 130
 const stackFit = 1
 const svgCellSize = 100
@@ -89,6 +89,32 @@ function getContourWalls(cells: ContourCell[]): ContourWall[] {
   mergeRuns(vertical, 'vertical')
 
   return walls
+}
+
+function FloorWalls({ walls }: { walls: ContourWall[] }) {
+  return (
+    <div className="floor-walls" aria-hidden="true">
+      {walls.map((wall) => (
+        <span
+          key={wall.key}
+          className={`floor-wall floor-wall-${wall.orientation}`}
+          style={wall.orientation === 'horizontal'
+            ? {
+              left: `${wall.start * mapCellSize}px`,
+              top: `${wall.line * mapCellSize}px`,
+              width: `${wall.length * mapCellSize}px`,
+              height: `${wallHeight}px`,
+            }
+            : {
+              left: `${wall.line * mapCellSize}px`,
+              top: `${wall.start * mapCellSize}px`,
+              width: `${wallHeight}px`,
+              height: `${wall.length * mapCellSize}px`,
+            }}
+        />
+      ))}
+    </div>
+  )
 }
 
 function App() {
@@ -329,7 +355,7 @@ function App() {
   const stackTotalHeight = Math.max(0, stackFloors.length - 1) * stackLayerGap +
     (hasFloorsAbove ? stackSelectedGap : 0)
   const stackExtraHeight = stackActive
-    ? stackTotalHeight * Math.sin(tilt * Math.PI / 180) * zoomScale
+    ? (stackTotalHeight + wallHeight) * Math.sin(tilt * Math.PI / 180) * zoomScale
     : 0
   const mapCanvasWidth = Math.ceil(
     (Math.abs(Math.cos(rotationRadians)) * planWidth +
@@ -553,6 +579,7 @@ function App() {
                               <path className="floor-fill" d={layerContour.fillPath} />
                               <path className="floor-boundary" d={layerContour.outlinePath} />
                             </svg>
+                            <FloorWalls walls={getContourWalls(stackContours[item.floor] ?? [])} />
                             {layerSpaces.map((space) => {
                               const matchesFilters = filteredSpaceIds.has(space.id)
                               const displayName = getSpaceLabel(space)
@@ -599,27 +626,7 @@ function App() {
                       <path className="floor-fill" d={fillPath} />
                       <path className="floor-boundary" d={outlinePath} />
                     </svg>
-                    <div className="floor-walls" aria-hidden="true">
-                      {contourWalls.map((wall) => (
-                        <span
-                          key={wall.key}
-                          className={`floor-wall floor-wall-${wall.orientation}`}
-                          style={wall.orientation === 'horizontal'
-                            ? {
-                              left: `${wall.start * mapCellSize}px`,
-                              top: `${wall.line * mapCellSize}px`,
-                              width: `${wall.length * mapCellSize}px`,
-                              height: `${wallHeight}px`,
-                            }
-                            : {
-                              left: `${wall.line * mapCellSize}px`,
-                              top: `${wall.start * mapCellSize}px`,
-                              width: `${wallHeight}px`,
-                              height: `${wall.length * mapCellSize}px`,
-                            }}
-                        />
-                      ))}
-                    </div>
+                    <FloorWalls walls={contourWalls} />
                     {floorSpaces.map((space) => {
                       const matchesFilters = filteredSpaceIds.has(space.id)
                       const hiddenInAdmin = adminMapActive && 'enabled' in space && !space.enabled

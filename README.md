@@ -110,9 +110,9 @@ frontend/
 - Selección de piso y espacios en el plano o en la lista.
 - Panel con detalles ficticios del espacio seleccionado.
 - Plano interactivo editable como matriz fija de 15 × 15 casillas por nivel; el contorno configurable define la superficie visible del piso sin mostrar casillas ocultas como salas.
-- Paredes 3D sobre los contornos activos de cada piso (vista de un solo piso): se levantan en el borde de la superficie visible, con una altura igual al ancho de una casilla (`wallHeight` en `frontend/src/App.tsx`) y son translúcidas para no ocultar las salas. No interceptan clics. La vista «Ver todos los pisos» no las dibuja.
+- Paredes 3D sobre los contornos activos de cada piso, tanto en la vista de un solo piso como en «Ver todos los pisos»: se levantan en el borde de la superficie visible, con una altura igual al ancho de una casilla (`wallHeight` en `frontend/src/App.tsx`), son translúcidas para no ocultar las salas y no interceptan clics.
 - Controles de rotación, inclinación y zoom (20 % a 140 %); la vista inicial es inclinada y la opción «Vista plana» cambia a una vista superior. Con el clic derecho sostenido sobre el mapa se desplaza el plano («mano»).
-- Botón «Ver todos los pisos»: muestra todos los niveles activos apilados como planos de 15 × 15 alineados sobre el eje Z, con el piso más alto arriba; el piso seleccionado queda separado del que tiene encima.
+- Botón «Ver todos los pisos»: muestra todos los niveles activos apilados como planos de 15 × 15 alineados sobre el eje Z, con el piso más alto arriba. La separación entre pisos es igual a la altura de las paredes, de modo que cada pared llega justo al piso de arriba; el piso seleccionado queda separado del que tiene encima.
 - En modo administración, mantener presionado el clic izquierdo sobre una casilla (0,4 s) y soltarla sobre otra intercambia sus datos como un cambio pendiente.
 - Panel admin protegido junto al mapa para activar u ocultar casillas y editar el nombre y tipo de cada espacio; el nombre puede quedar vacío y en ese caso se muestra el código de la casilla. En modo administración se muestran todas las casillas y las ocultas aparecen en gris.
 - En modo administración se pueden editar las 225 casillas del nivel, incluidas las ocultas, y definir cuáles ocultas forman parte del contorno del piso. Las casillas visibles siempre forman parte del contorno.

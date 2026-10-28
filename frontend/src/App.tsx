@@ -23,6 +23,33 @@ const stackLayerGap = wallHeight
 const stackSelectedGap = 130
 const stackFit = 1
 const svgCellSize = 100
+const groundFloor = 1
+
+function getGrassPath(cells: ContourCell[]) {
+  const occupied = new Set(cells.map(({ x, y }) => `${x}:${y}`))
+  let path = ''
+
+  for (let y = 0; y < matrixSize; y += 1) {
+    for (let x = 0; x < matrixSize; x += 1) {
+      if (occupied.has(`${x}:${y}`)) continue
+      path += `M${x * svgCellSize} ${y * svgCellSize}h${svgCellSize}v${svgCellSize}h-${svgCellSize}z`
+    }
+  }
+
+  return path
+}
+
+function FloorGrass({ cells }: { cells: ContourCell[] }) {
+  return (
+    <svg
+      className="floor-grass"
+      viewBox={`0 0 ${matrixSize * svgCellSize} ${matrixSize * svgCellSize}`}
+      aria-hidden="true"
+    >
+      <path d={getGrassPath(cells)} />
+    </svg>
+  )
+}
 
 function getContourPaths(cells: ContourCell[]) {
   const occupied = new Set(
@@ -134,6 +161,7 @@ function App() {
   const [accessibleOnly, setAccessibleOnly] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [showWalls, setShowWalls] = useState(true)
+  const [showGrass, setShowGrass] = useState(true)
   const filtersButtonRef = useRef<HTMLButtonElement>(null)
   const [floor, setFloor] = useState(1)
   const [floors, setFloors] = useState<FloorPlan[]>([])
@@ -660,6 +688,7 @@ function App() {
                               gridTemplateRows: `repeat(${floorPlan.verticalLength}, ${mapCellSize}px)`,
                             }}
                           >
+                            {showGrass && item.floor === groundFloor && <FloorGrass cells={stackContours[item.floor] ?? []} />}
                             <svg
                               className="floor-outline"
                               viewBox={`0 0 ${floorPlan.horizontalLength * svgCellSize} ${floorPlan.verticalLength * svgCellSize}`}
@@ -710,6 +739,7 @@ function App() {
                       gridTemplateRows: `repeat(${floorPlan.verticalLength}, ${mapCellSize}px)`,
                     }}
                   >
+                    {showGrass && floor === groundFloor && <FloorGrass cells={contourCells} />}
                     <svg
                       className="floor-outline"
                       viewBox={`0 0 ${floorPlan.horizontalLength * svgCellSize} ${floorPlan.verticalLength * svgCellSize}`}
@@ -969,6 +999,8 @@ function App() {
         triggerRef={filtersButtonRef}
         showWalls={showWalls}
         onToggleWalls={() => setShowWalls((value) => !value)}
+        showGrass={showGrass}
+        onToggleGrass={() => setShowGrass((value) => !value)}
         activeKinds={activeKinds}
         accessibleOnly={accessibleOnly}
         resultCount={filteredSpaces.length}

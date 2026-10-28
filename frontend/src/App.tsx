@@ -9,6 +9,7 @@ const defaultView = { rotation: -39, tilt: 61, zoom: 60 }
 const flatView = { rotation: 0, tilt: 0, zoom: 55 }
 const matrixSize = 15
 const mapCellSize = 60
+const wallHeight = mapCellSize
 const mapCanvasPadding = 240
 const slotDragDelayMs = 400
 const stackLayerGap = 45
@@ -37,6 +38,57 @@ function getContourPaths(cells: ContourCell[]) {
   }
 
   return { fillPath, outlinePath }
+}
+
+type ContourWall = {
+  key: string
+  orientation: 'horizontal' | 'vertical'
+  line: number
+  start: number
+  length: number
+}
+
+function getContourWalls(cells: ContourCell[]): ContourWall[] {
+  const occupied = new Set(
+    cells
+      .filter(({ x, y }) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && x < matrixSize && y >= 0 && y < matrixSize)
+      .map(({ x, y }) => `${x}:${y}`),
+  )
+  const horizontal = new Map<number, number[]>()
+  const vertical = new Map<number, number[]>()
+  const addEdge = (edges: Map<number, number[]>, line: number, position: number) => {
+    edges.set(line, [...(edges.get(line) ?? []), position])
+  }
+
+  for (const cell of occupied) {
+    const [x, y] = cell.split(':').map(Number)
+    if (!occupied.has(`${x}:${y - 1}`)) addEdge(horizontal, y, x)
+    if (!occupied.has(`${x}:${y + 1}`)) addEdge(horizontal, y + 1, x)
+    if (!occupied.has(`${x - 1}:${y}`)) addEdge(vertical, x, y)
+    if (!occupied.has(`${x + 1}:${y}`)) addEdge(vertical, x + 1, y)
+  }
+
+  const walls: ContourWall[] = []
+  const mergeRuns = (edges: Map<number, number[]>, orientation: ContourWall['orientation']) => {
+    for (const [line, positions] of edges) {
+      const sorted = [...positions].sort((a, b) => a - b)
+      let start = sorted[0]
+      let previous = sorted[0]
+      for (const position of [...sorted.slice(1), Infinity]) {
+        if (position === previous + 1) {
+          previous = position
+          continue
+        }
+        walls.push({ key: `${orientation}-${line}-${start}`, orientation, line, start, length: previous - start + 1 })
+        start = position
+        previous = position
+      }
+    }
+  }
+  mergeRuns(horizontal, 'horizontal')
+  mergeRuns(vertical, 'vertical')
+
+  return walls
 }
 
 function App() {
@@ -266,6 +318,7 @@ function App() {
       .filter((slot) => slot.enabled || slot.useContour)
     : floorPlan.contourCells ?? []
   const { fillPath, outlinePath } = getContourPaths(contourCells)
+  const contourWalls = getContourWalls(contourCells)
   const rotationRadians = rotation * Math.PI / 180
   const tiltScale = Math.cos(tilt * Math.PI / 180)
   const stackActive = stackView && !adminMapActive
@@ -546,6 +599,27 @@ function App() {
                       <path className="floor-fill" d={fillPath} />
                       <path className="floor-boundary" d={outlinePath} />
                     </svg>
+                    <div className="floor-walls" aria-hidden="true">
+                      {contourWalls.map((wall) => (
+                        <span
+                          key={wall.key}
+                          className={`floor-wall floor-wall-${wall.orientation}`}
+                          style={wall.orientation === 'horizontal'
+                            ? {
+                              left: `${wall.start * mapCellSize}px`,
+                              top: `${wall.line * mapCellSize}px`,
+                              width: `${wall.length * mapCellSize}px`,
+                              height: `${wallHeight}px`,
+                            }
+                            : {
+                              left: `${wall.line * mapCellSize}px`,
+                              top: `${wall.start * mapCellSize}px`,
+                              width: `${wallHeight}px`,
+                              height: `${wall.length * mapCellSize}px`,
+                            }}
+                        />
+                      ))}
+                    </div>
                     {floorSpaces.map((space) => {
                       const matchesFilters = filteredSpaceIds.has(space.id)
                       const hiddenInAdmin = adminMapActive && 'enabled' in space && !space.enabled

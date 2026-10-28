@@ -14,6 +14,9 @@ const mapCanvasPadding = 240
 const slotDragDelayMs = 400
 const orbitThresholdPx = 5
 const orbitDegreesPerPixel = 0.4
+const minZoom = 20
+const maxZoom = 140
+const wheelZoomPerPixel = 0.05
 const stackLayerGap = wallHeight
 const stackSelectedGap = 130
 const stackFit = 1
@@ -156,6 +159,19 @@ function App() {
     viewport.scrollLeft = (viewport.scrollWidth - viewport.clientWidth) / 2
     viewport.scrollTop = (viewport.scrollHeight - viewport.clientHeight) / 2
   }, [stackView])
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      setZoom((value) => Math.max(minZoom, Math.min(maxZoom, Math.round(value - event.deltaY * wheelZoomPerPixel))))
+    }
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false })
+    return () => viewport.removeEventListener('wheel', handleWheel)
+  }, [])
   const [stackContours, setStackContours] = useState<Record<number, ContourCell[]>>({})
   const swapSlotsRef = useRef<((fromId: string, toId: string) => void) | null>(null)
   const dragTimerRef = useRef<number | null>(null)
@@ -747,13 +763,13 @@ function App() {
                   type="button"
                   className="zoom-button"
                   aria-label="Alejar mapa"
-                  onClick={() => setZoom((value) => Math.max(20, value - 10))}
+                  onClick={() => setZoom((value) => Math.max(minZoom, value - 10))}
                 >−</button>
                 <input
                   id="zoom"
                   type="range"
-                  min="20"
-                  max="140"
+                  min={minZoom}
+                  max={maxZoom}
                   value={zoom}
                   onChange={(event) => setZoom(Number(event.target.value))}
                   aria-label={`Zoom: ${zoom} por ciento`}
@@ -762,7 +778,7 @@ function App() {
                   type="button"
                   className="zoom-button"
                   aria-label="Acercar mapa"
-                  onClick={() => setZoom((value) => Math.min(140, value + 10))}
+                  onClick={() => setZoom((value) => Math.min(maxZoom, value + 10))}
                 >＋</button>
               </div>
               <button type="button" className="reset-button" onClick={resetView}>

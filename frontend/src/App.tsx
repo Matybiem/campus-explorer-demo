@@ -300,9 +300,9 @@ function App() {
   }, [accessibleOnly, activeKinds, query, spaces])
 
   const activeFilterCount = spaceKinds.length - activeKinds.size + (accessibleOnly ? 1 : 0)
-  const closeFilters = useCallback(() => {
+  const closeFilters = useCallback((restoreFocus: boolean) => {
     setFiltersOpen(false)
-    filtersButtonRef.current?.focus()
+    if (restoreFocus) filtersButtonRef.current?.focus()
   }, [])
   const toggleKind = useCallback((key: string) => {
     setActiveKinds((current) => {
@@ -965,6 +965,7 @@ function App() {
       </main>
       <FiltersPanel
         open={filtersOpen}
+        triggerRef={filtersButtonRef}
         activeKinds={activeKinds}
         accessibleOnly={accessibleOnly}
         resultCount={filteredSpaces.length}

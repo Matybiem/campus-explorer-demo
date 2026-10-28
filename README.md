@@ -4,7 +4,7 @@ Aplicación de portafolio para explorar salas y servicios de un campus ficticio.
 
 ## Estado del proyecto
 
-Versión actual: **v1.1.0**. Para volver a este punto: `git checkout v1.1.0`. El trabajo posterior se desarrolla en ramas nuevas (`feature/...`) y las versiones se marcan con tags (`vMAYOR.MENOR.PARCHE`).
+Versión actual: **v1.2.0**. Para volver a una versión anterior: `git checkout v1.1.0`. El trabajo posterior se desarrolla en ramas nuevas (`feature/...`) y las versiones se marcan con tags (`vMAYOR.MENOR.PARCHE`): se sube el número menor con funcionalidades nuevas y el parche con correcciones.
 
 La rama `feature/fixed-floor-matrix-contour` incluye el plano interactivo con matriz fija de 15 × 15, el panel de administración y la API. Para probarla:
 
@@ -110,6 +110,7 @@ frontend/
 - Selección de piso y espacios en el plano o en la lista.
 - Panel con detalles ficticios del espacio seleccionado.
 - Plano interactivo editable como matriz fija de 15 × 15 casillas por nivel; el contorno configurable define la superficie visible del piso sin mostrar casillas ocultas como salas.
+- Paredes 3D sobre los contornos activos de cada piso (vista de un solo piso): se levantan en el borde de la superficie visible, con una altura igual al ancho de una casilla (`wallHeight` en `frontend/src/App.tsx`) y son translúcidas para no ocultar las salas. No interceptan clics. La vista «Ver todos los pisos» no las dibuja.
 - Controles de rotación, inclinación y zoom (20 % a 140 %); la vista inicial es inclinada y la opción «Vista plana» cambia a una vista superior. Con el clic derecho sostenido sobre el mapa se desplaza el plano («mano»).
 - Botón «Ver todos los pisos»: muestra todos los niveles activos apilados como planos de 15 × 15 alineados sobre el eje Z, con el piso más alto arriba; el piso seleccionado queda separado del que tiene encima.
 - En modo administración, mantener presionado el clic izquierdo sobre una casilla (0,4 s) y soltarla sobre otra intercambia sus datos como un cambio pendiente.

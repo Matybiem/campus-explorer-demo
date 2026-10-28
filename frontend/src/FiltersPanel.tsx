@@ -1,21 +1,23 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import { Icon } from './icons'
 import SpaceIcon from './SpaceIcon'
 import { getSpaceColorClass, spaceKinds } from './types'
 
 type FiltersPanelProps = {
   open: boolean
+  triggerRef: RefObject<HTMLElement | null>
   activeKinds: ReadonlySet<string>
   accessibleOnly: boolean
   resultCount: number
   onToggleKind: (key: string) => void
   onToggleAccessible: () => void
   onReset: () => void
-  onClose: () => void
+  onClose: (restoreFocus: boolean) => void
 }
 
 function FiltersPanel({
   open,
+  triggerRef,
   activeKinds,
   accessibleOnly,
   resultCount,
@@ -24,20 +26,31 @@ function FiltersPanel({
   onReset,
   onClose,
 }: FiltersPanelProps) {
+  const panelRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (!open) return
     closeButtonRef.current?.focus()
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') onClose(true)
+    }
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return
+      onClose(false)
     }
     document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open, onClose])
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [open, onClose, triggerRef])
 
   return (
     <aside
+      ref={panelRef}
       id="filters-drawer"
       className={`filters-drawer${open ? ' is-open' : ''}`}
       role="dialog"
@@ -49,7 +62,7 @@ function FiltersPanel({
           <h2>Filtros</h2>
           <p>Los espacios en color se muestran; los grises se ocultan.</p>
         </div>
-        <button ref={closeButtonRef} type="button" className="filters-close" onClick={onClose} aria-label="Cerrar filtros">
+        <button ref={closeButtonRef} type="button" className="filters-close" onClick={() => onClose(true)} aria-label="Cerrar filtros">
           <Icon name="x" />
         </button>
       </div>

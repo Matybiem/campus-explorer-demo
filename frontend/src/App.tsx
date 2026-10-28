@@ -474,7 +474,10 @@ function App() {
                     type="button"
                     className={`stack-toggle${stackView ? ' is-active' : ''}`}
                     aria-pressed={stackView}
-                    onClick={() => setStackView((value) => !value)}
+                    onClick={() => {
+                      if (!stackView && orderedFloors.length > 0) setFloor(orderedFloors[0].floor)
+                      setStackView((value) => !value)
+                    }}
                   >
                     {stackView ? 'Ver un piso' : 'Ver todos los pisos'}
                   </button>

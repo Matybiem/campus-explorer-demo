@@ -153,6 +153,7 @@ El usuario controla la cámara del mapa con el ratón o con los controles de la 
 
 El botón «Ver todos los pisos» muestra todos los niveles activos apilados en el eje Z.
 
+- **Piso por defecto:** cada vez que se activa la vista, el piso seleccionado pasa a ser el más alto. Después se puede elegir otro piso desde el selector.
 - **Planos alineados:** cada piso es un plano de 15 × 15 con el mismo origen, así que la casilla (x, y) de un piso queda sobre la (x, y) del piso de abajo.
 - **Orden:** el piso más alto va arriba y cada plano lleva una etiqueta con su nombre.
 - **Separación:** la distancia entre pisos es igual a la altura de las paredes (`stackLayerGap`), de modo que cada pared llega justo al piso de arriba. El piso seleccionado queda más separado del que tiene encima (`stackSelectedGap`).

@@ -6,6 +6,8 @@ import { getSpaceColorClass, spaceKinds } from './types'
 type FiltersPanelProps = {
   open: boolean
   triggerRef: RefObject<HTMLElement | null>
+  showWalls: boolean
+  onToggleWalls: () => void
   activeKinds: ReadonlySet<string>
   accessibleOnly: boolean
   resultCount: number
@@ -18,6 +20,8 @@ type FiltersPanelProps = {
 function FiltersPanel({
   open,
   triggerRef,
+  showWalls,
+  onToggleWalls,
   activeKinds,
   accessibleOnly,
   resultCount,
@@ -92,6 +96,15 @@ function FiltersPanel({
         >
           <Icon name="hand-stop" />
           <span>Accesible</span>
+        </button>
+        <button
+          type="button"
+          className={`filter-tile filter-tile-walls${showWalls ? ' is-on' : ''}`}
+          aria-pressed={showWalls}
+          onClick={onToggleWalls}
+        >
+          <Icon name="wall" />
+          <span>Paredes</span>
         </button>
       </div>
 

@@ -26,6 +26,23 @@ export const spaceCategories: SpaceCategory[] = [
   'Comida',
 ]
 
+export type SpaceKind = {
+  key: string
+  type: SpaceType
+  category: SpaceCategory | null
+}
+
+export const spaceKinds: SpaceKind[] = [
+  { key: 'Sala', type: 'Sala', category: null },
+  { key: 'Laboratorio', type: 'Laboratorio', category: null },
+  { key: 'Administrativo', type: 'Administrativo', category: null },
+  ...spaceCategories.map((category): SpaceKind => ({ key: category, type: 'Espacio común', category })),
+]
+
+export function getSpaceKindKey(space: { type: SpaceType; category: SpaceCategory | null }): string {
+  return space.type === 'Espacio común' ? space.category ?? space.type : space.type
+}
+
 export function getSpaceColorClass(type: SpaceType, category: SpaceCategory | null): string {
   if (type !== 'Espacio común') {
     if (type === 'Laboratorio') return 'room-lab'

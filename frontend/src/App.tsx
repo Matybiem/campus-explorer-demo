@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import AdminPanel from './AdminPanel'
+import FiltersPanel from './FiltersPanel'
 import SpaceIcon from './SpaceIcon'
 import { fetchFloorPlan, fetchFloors, fetchSpaces } from './api'
 import { setAdminFloorActive } from './adminApi'
-import { floorLabel, getSpaceColorClass, getSpaceLabel, spaceTypes, type AdminSlot, type ContourCell, type FloorPlan, type Space } from './types'
+import { floorLabel, getSpaceColorClass, getSpaceKindKey, getSpaceLabel, spaceKinds, type AdminSlot, type ContourCell, type FloorPlan, type Space } from './types'
 
 const defaultView = { rotation: -39, tilt: 61, zoom: 60 }
 const flatView = { rotation: 0, tilt: 0, zoom: 55 }
@@ -128,8 +129,10 @@ function App() {
   const [apiError, setApiError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [query, setQuery] = useState('')
-  const [typeFilter, setTypeFilter] = useState('Todos')
+  const [activeKinds, setActiveKinds] = useState<ReadonlySet<string>>(() => new Set(spaceKinds.map((kind) => kind.key)))
   const [accessibleOnly, setAccessibleOnly] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const filtersButtonRef = useRef<HTMLButtonElement>(null)
   const [floor, setFloor] = useState(1)
   const [floors, setFloors] = useState<FloorPlan[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -283,7 +286,7 @@ function App() {
     const normalizedQuery = query.trim().toLocaleLowerCase('es')
 
     return spaces.filter((space) => {
-      const matchesType = typeFilter === 'Todos' || space.type === typeFilter
+      const matchesType = activeKinds.has(getSpaceKindKey(space))
       const matchesAccessibility = !accessibleOnly || space.accessible
       const matchesQuery =
         !normalizedQuery ||
@@ -293,7 +296,24 @@ function App() {
 
       return matchesType && matchesAccessibility && matchesQuery
     })
-  }, [accessibleOnly, query, spaces, typeFilter])
+  }, [accessibleOnly, activeKinds, query, spaces])
+
+  const activeFilterCount = spaceKinds.length - activeKinds.size + (accessibleOnly ? 1 : 0)
+  const closeFilters = useCallback(() => {
+    setFiltersOpen(false)
+    filtersButtonRef.current?.focus()
+  }, [])
+  const toggleKind = useCallback((key: string) => {
+    setActiveKinds((current) => {
+      const next = new Set(current)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
+  }, [])
+  const resetFilters = useCallback(() => {
+    setActiveKinds(new Set(spaceKinds.map((kind) => kind.key)))
+    setAccessibleOnly(false)
+  }, [])
 
   const selectedSpace = spaces.find((space) => space.id === selectedId)
   const adminMapActive = adminOpen && adminSlots !== null
@@ -862,22 +882,25 @@ function App() {
                 <kbd>↵</kbd>
               </label>
               <div className="search-filters">
-                <label className="filter-field">
-                  <span>Tipo de espacio</span>
-                  <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-                    <option>Todos</option>
-                    {spaceTypes.map((type) => <option key={type}>{type}</option>)}
-                  </select>
-                </label>
-                <label className="accessibility-filter">
-                  <input
-                    type="checkbox"
-                    checked={accessibleOnly}
-                    onChange={(event) => setAccessibleOnly(event.target.checked)}
-                  />
-                  <span className="checkmark" aria-hidden="true">✓</span>
-                  Accesible
-                </label>
+                <button
+                  ref={filtersButtonRef}
+                  type="button"
+                  className={`filters-button${activeFilterCount > 0 ? ' has-active' : ''}`}
+                  aria-expanded={filtersOpen}
+                  aria-controls="filters-drawer"
+                  onClick={() => setFiltersOpen((value) => !value)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5Z" /></svg>
+                  Filtros
+                  {activeFilterCount > 0 && (
+                    <span
+                      className="filters-badge"
+                      aria-label={`${activeFilterCount} ${activeFilterCount === 1 ? 'filtro activo' : 'filtros activos'}`}
+                    >
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
               </div>
             </section>
 
@@ -912,8 +935,7 @@ function App() {
                     <p>No encontramos espacios con esos filtros.</p>
                     <button type="button" onClick={() => {
                       setQuery('')
-                      setTypeFilter('Todos')
-                      setAccessibleOnly(false)
+                      resetFilters()
                     }}>Limpiar filtros</button>
                   </div>
                 )}
@@ -936,6 +958,16 @@ function App() {
           </p>
         </footer>
       </main>
+      <FiltersPanel
+        open={filtersOpen}
+        activeKinds={activeKinds}
+        accessibleOnly={accessibleOnly}
+        resultCount={filteredSpaces.length}
+        onToggleKind={toggleKind}
+        onToggleAccessible={() => setAccessibleOnly((value) => !value)}
+        onReset={resetFilters}
+        onClose={closeFilters}
+      />
     </div>
   )
 }

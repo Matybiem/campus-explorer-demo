@@ -176,7 +176,7 @@ h1 {
   z-index: 40;
   top: 0;
   bottom: 0;
-  left: 0;
+  right: 0;
   display: flex;
   width: min(340px, 92vw);
   flex-direction: column;
@@ -184,10 +184,10 @@ h1 {
   padding: 20px 18px;
   overflow-y: auto;
   background: white;
-  border-right: 1px solid #e1e7ef;
-  box-shadow: 8px 0 30px #1d365022;
+  border-left: 1px solid #e1e7ef;
+  box-shadow: -8px 0 30px #1d365022;
   visibility: hidden;
-  transform: translateX(-105%);
+  transform: translateX(105%);
   transition: transform .22s ease, visibility 0s linear .22s;
 }
 .filters-drawer.is-open {

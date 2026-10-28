@@ -133,6 +133,7 @@ function App() {
   const [activeKinds, setActiveKinds] = useState<ReadonlySet<string>>(() => new Set(spaceKinds.map((kind) => kind.key)))
   const [accessibleOnly, setAccessibleOnly] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const [showWalls, setShowWalls] = useState(true)
   const filtersButtonRef = useRef<HTMLButtonElement>(null)
   const [floor, setFloor] = useState(1)
   const [floors, setFloors] = useState<FloorPlan[]>([])
@@ -396,7 +397,7 @@ function App() {
   const stackTotalHeight = Math.max(0, stackFloors.length - 1) * stackLayerGap +
     (hasFloorsAbove ? stackSelectedGap : 0)
   const stackExtraHeight = stackActive
-    ? (stackTotalHeight + wallHeight) * Math.sin(tilt * Math.PI / 180) * zoomScale
+    ? (stackTotalHeight + (showWalls ? wallHeight : 0)) * Math.sin(tilt * Math.PI / 180) * zoomScale
     : 0
   const mapCanvasWidth = Math.ceil(
     (Math.abs(Math.cos(rotationRadians)) * planWidth +
@@ -667,7 +668,7 @@ function App() {
                               <path className="floor-fill" d={layerContour.fillPath} />
                               <path className="floor-boundary" d={layerContour.outlinePath} />
                             </svg>
-                            <FloorWalls walls={getContourWalls(stackContours[item.floor] ?? [])} />
+                            {showWalls && <FloorWalls walls={getContourWalls(stackContours[item.floor] ?? [])} />}
                             {layerSpaces.map((space) => {
                               const matchesFilters = filteredSpaceIds.has(space.id)
                               const displayName = getSpaceLabel(space)
@@ -717,7 +718,7 @@ function App() {
                       <path className="floor-fill" d={fillPath} />
                       <path className="floor-boundary" d={outlinePath} />
                     </svg>
-                    <FloorWalls walls={contourWalls} />
+                    {showWalls && <FloorWalls walls={contourWalls} />}
                     {floorSpaces.map((space) => {
                       const matchesFilters = filteredSpaceIds.has(space.id)
                       const hiddenInAdmin = adminMapActive && 'enabled' in space && !space.enabled
@@ -966,6 +967,8 @@ function App() {
       <FiltersPanel
         open={filtersOpen}
         triggerRef={filtersButtonRef}
+        showWalls={showWalls}
+        onToggleWalls={() => setShowWalls((value) => !value)}
         activeKinds={activeKinds}
         accessibleOnly={accessibleOnly}
         resultCount={filteredSpaces.length}

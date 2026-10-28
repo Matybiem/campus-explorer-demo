@@ -4,16 +4,26 @@ import { rateLimit } from 'express-rate-limit'
 import session from 'express-session'
 import helmet from 'helmet'
 
+const matrixSize = 15
+
 export const spaceTypes = new Set([
   'Sala',
   'Laboratorio',
   'Administrativo',
-  'Baño hombre',
-  'Baño mujer',
+  'Espacio común',
 ])
+const spaceCategories = new Set(['Baño hombre', 'Baño mujer', 'Escalera', 'Ascensor', 'Comida'])
+
+function validCategory(type, category) {
+  return type === 'Espacio común'
+    ? typeof category === 'string' && spaceCategories.has(category)
+    : category === null
+}
 
 function validFloor(value) {
-  return typeof value === 'string' && /^[1-9]\d*$/.test(value)
+  if (typeof value !== 'string' || !/^-?[1-9]\d*$/.test(value)) return false
+  const floor = Number(value)
+  return (floor >= 1 && floor <= 10) || (floor >= -5 && floor <= -1)
 }
 
 function asyncRoute(handler) {
@@ -45,7 +55,7 @@ export function createApp({ repositories, sessionStore, sessionSecret, secureCoo
   app.disable('x-powered-by')
   app.set('trust proxy', secureCookies ? 1 : false)
   app.use(helmet())
-  app.use(express.json({ limit: '20kb' }))
+  app.use(express.json({ limit: '1mb' }))
   app.use(session({
     name: 'campus.sid',
     secret: sessionSecret,
@@ -63,6 +73,23 @@ export function createApp({ repositories, sessionStore, sessionSecret, secureCoo
   app.get('/api/health', (_request, response) => {
     response.json({ status: 'ok' })
   })
+
+  app.get('/api/floors', asyncRoute(async (_request, response) => {
+    response.json(await repositories.listFloors())
+  }))
+
+  app.get('/api/floors/:floor/plan', asyncRoute(async (request, response) => {
+    if (!validFloor(request.params.floor)) {
+      response.status(400).json({ error: 'El piso debe estar entre -5 y -1, o entre 1 y 10.' })
+      return
+    }
+    const floorPlan = await repositories.getFloorPlan(Number(request.params.floor))
+    if (!floorPlan) {
+      response.status(404).json({ error: 'No se encontró el plano del piso.' })
+      return
+    }
+    response.json(floorPlan)
+  }))
 
   app.get('/api/spaces', asyncRoute(async (request, response) => {
     const { q, type, floor, accessible } = request.query
@@ -162,30 +189,145 @@ export function createApp({ repositories, sessionStore, sessionSecret, secureCoo
   }))
 
   app.patch('/api/admin/slots/:id', requireAdmin, asyncRoute(async (request, response) => {
-    const { name, type, enabled } = request.body ?? {}
-    if (typeof name !== 'string' || name.trim().length < 2 || name.trim().length > 60) {
-      response.status(400).json({ error: 'El nombre debe tener entre 2 y 60 caracteres.' })
+    const { name, type, category: requestedCategory, enabled, useContour, accessible, description } = request.body ?? {}
+    const category = requestedCategory ?? null
+    if (typeof name !== 'string' || name.trim().length > 60) {
+      response.status(400).json({ error: 'El nombre debe tener como máximo 60 caracteres.' })
       return
     }
     if (typeof type !== 'string' || !spaceTypes.has(type)) {
       response.status(400).json({ error: 'El tipo de espacio no es válido.' })
       return
     }
+    if (!validCategory(type, category)) {
+      response.status(400).json({ error: 'La categoría no es válida para este tipo de espacio.' })
+      return
+    }
     if (typeof enabled !== 'boolean') {
       response.status(400).json({ error: 'enabled debe ser true o false.' })
       return
     }
+    if (typeof useContour !== 'boolean') {
+      response.status(400).json({ error: 'useContour debe ser true o false.' })
+      return
+    }
+    if (typeof accessible !== 'boolean') {
+      response.status(400).json({ error: 'accessible debe ser true o false.' })
+      return
+    }
+    if (typeof description !== 'string' || description.trim().length > 500) {
+      response.status(400).json({ error: 'La descripción debe tener como máximo 500 caracteres.' })
+      return
+    }
 
     const updatedSlot = await repositories.updateSlot(request.params.id, {
-      name: name.trim(),
+      name: type === 'Espacio común' ? '' : name.trim(),
       type,
+      category,
       enabled,
+      useContour: enabled || useContour,
+      accessible,
+      description: description.trim(),
     })
     if (!updatedSlot) {
       response.status(404).json({ error: 'No se encontró la casilla solicitada.' })
       return
     }
     response.json(updatedSlot)
+  }))
+
+  app.patch('/api/admin/floors/:floor/slots', requireAdmin, asyncRoute(async (request, response) => {
+    if (!validFloor(request.params.floor)) {
+      response.status(400).json({ error: 'El piso debe estar entre -5 y -1, o entre 1 y 10.' })
+      return
+    }
+
+    const { slots } = request.body ?? {}
+    if (!Array.isArray(slots) || slots.length === 0 || slots.length > matrixSize * matrixSize) {
+      response.status(400).json({ error: 'Debes enviar entre 1 y 225 casillas para guardar.' })
+      return
+    }
+
+    const slotIds = new Set()
+    const updates = []
+    for (const slot of slots) {
+      if (
+        typeof slot?.id !== 'string' ||
+        slot.id.length === 0 ||
+        slot.id.length > 30 ||
+        slotIds.has(slot.id)
+      ) {
+        response.status(400).json({ error: 'La lista contiene un identificador de casilla no válido o repetido.' })
+        return
+      }
+      if (typeof slot.name !== 'string' || slot.name.trim().length > 60) {
+        response.status(400).json({ error: 'Cada nombre debe tener como máximo 60 caracteres.' })
+        return
+      }
+      if (typeof slot.type !== 'string' || !spaceTypes.has(slot.type)) {
+        response.status(400).json({ error: 'Uno o más tipos de espacio no son válidos.' })
+        return
+      }
+      const category = slot.category ?? null
+      if (!validCategory(slot.type, category)) {
+        response.status(400).json({ error: 'Una o más categorías no son válidas para su tipo de espacio.' })
+        return
+      }
+      if (typeof slot.enabled !== 'boolean') {
+        response.status(400).json({ error: 'Cada valor enabled debe ser true o false.' })
+        return
+      }
+      if (typeof slot.useContour !== 'boolean') {
+        response.status(400).json({ error: 'Cada valor useContour debe ser true o false.' })
+        return
+      }
+      if (typeof slot.accessible !== 'boolean') {
+        response.status(400).json({ error: 'Cada valor accessible debe ser true o false.' })
+        return
+      }
+      if (typeof slot.description !== 'string' || slot.description.trim().length > 500) {
+        response.status(400).json({ error: 'Cada descripción debe tener como máximo 500 caracteres.' })
+        return
+      }
+
+      slotIds.add(slot.id)
+      updates.push({
+        id: slot.id,
+        name: slot.type === 'Espacio común' ? '' : slot.name.trim(),
+        type: slot.type,
+        category,
+        enabled: slot.enabled,
+        useContour: slot.enabled || slot.useContour,
+        accessible: slot.accessible,
+        description: slot.description.trim(),
+      })
+    }
+
+    const result = await repositories.updateSlots(Number(request.params.floor), updates)
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error })
+      return
+    }
+    response.json({ slots: result.slots })
+  }))
+
+  app.patch('/api/admin/floors/:floor/active', requireAdmin, asyncRoute(async (request, response) => {
+    if (!validFloor(request.params.floor)) {
+      response.status(400).json({ error: 'El piso debe estar entre -5 y -1, o entre 1 y 10.' })
+      return
+    }
+    const { active } = request.body ?? {}
+    if (typeof active !== 'boolean') {
+      response.status(400).json({ error: 'active debe ser true o false.' })
+      return
+    }
+
+    const result = await repositories.setFloorActive(Number(request.params.floor), active)
+    if (!result.ok) {
+      response.status(result.status).json({ error: result.error })
+      return
+    }
+    response.json({ floors: result.floors })
   }))
 
   app.use((_request, response) => {

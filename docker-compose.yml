@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  database:
+    image: postgres:15-alpine
+    container_name: campus-db
+    environment:
+      POSTGRES_DB: campus_explorer
+      POSTGRES_USER: campus_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - campus-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campus_user -d campus_explorer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: campus-backend
+    environment:
+      DATABASE_URL: postgresql://campus_user:${DB_PASSWORD}@database:5432/campus_explorer
+      SESSION_SECRET: ${SESSION_SECRET}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      PORT: 3001
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - campus-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: campus-frontend
+    environment:
+      VITE_API_URL: http://localhost:3001/api
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - campus-network
+    restart: unless-stopped
+
+networks:
+  campus-network:
+    driver: bridge
+
+volumes:
+  pgdata:

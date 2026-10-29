@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import AdminPanel from './AdminPanel'
 import FiltersPanel from './FiltersPanel'
 import { Icon } from './icons'
@@ -151,6 +151,20 @@ function FloorWalls({ walls }: { walls: ContourWall[] }) {
   )
 }
 
+/** Genera un código legible para sala/laboratorio desde su nombre y piso.
+ *  Formato: [S|L]-[2 últimos dígitos]-P[2 dígitos piso]-[Ala]
+ *  Ejemplo: nombre "A405", piso 4, tipo Sala → S-05-P04-A
+ */
+function suggestSpaceCode(space: { name: string; floor: number; type: string }): string {
+  const prefix = space.type === 'Laboratorio' ? 'L' : 'S'
+  const match = space.name.trim().match(/^([A-Za-z])(\d{3})/)
+  if (!match) return ''
+  const wing = match[1].toUpperCase()
+  const roomDigits = match[2].slice(1)
+  const hasDash = space.name.includes('-')
+  const floorStr = space.floor < 0 && hasDash ? `S${String(Math.abs(space.floor)).padStart(2, '0')}` : `P${String(space.floor < 0 ? Math.abs(space.floor) : space.floor).padStart(2, '0')}`
+  return `${prefix}-${roomDigits}-${floorStr}-${wing}`
+}
 function App() {
   const [spaces, setSpaces] = useState<Space[]>([])
   const [loading, setLoading] = useState(true)
@@ -313,15 +327,15 @@ function App() {
   }, [stackView, floors, reloadKey])
 
   const filteredSpaces = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase('es')
+    const normalizedQuery = query.trim().toUpperCase()
 
     return spaces.filter((space) => {
       const matchesType = activeKinds.has(getSpaceKindKey(space))
       const matchesAccessibility = !accessibleOnly || space.accessible
       const matchesQuery =
         !normalizedQuery ||
-        `${space.id} ${space.name} ${space.type} ${space.category ?? ''}`
-          .toLocaleLowerCase('es')
+        `${space.id} ${space.name} ${space.type} ${space.category ?? ''} ${space.customCode ?? suggestSpaceCode(space)}`
+          .toUpperCase()
           .includes(normalizedQuery)
 
       return matchesType && matchesAccessibility && matchesQuery
@@ -468,19 +482,6 @@ function App() {
       </header>
 
       <main id="inicio" className="page-content">
-        <section className="intro">
-          <div>
-            <p className="eyebrow">EXPLORA A TU MANERA</p>
-            <h1>Encuentra tu próximo espacio</h1>
-            <p className="intro-copy">
-              Explora un campus de ejemplo y encuentra salas y servicios sin perderte.
-            </p>
-          </div>
-          <div className="campus-chip">
-            <span className="campus-icon" aria-hidden="true"><Icon name="home" /></span>
-            Campus de demostración
-          </div>
-        </section>
 
         {(loading || apiError) && (
           <div className={`api-status${apiError ? ' api-status-error' : ''}`} role="status">
@@ -520,17 +521,38 @@ function App() {
                   <span aria-hidden="true"><Icon name="chevron-down" /></span>
                 </label>
                 {!adminMapActive && (
-                  <button
-                    type="button"
-                    className={`stack-toggle${stackView ? ' is-active' : ''}`}
-                    aria-pressed={stackView}
-                    onClick={() => {
-                      if (!stackView && orderedFloors.length > 0) setFloor(orderedFloors[0].floor)
-                      setStackView((value) => !value)
-                    }}
-                  >
-                    {stackView ? 'Ver un piso' : 'Ver todos los pisos'}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className={`stack-toggle${stackView ? ' is-active' : ''}`}
+                      aria-pressed={stackView}
+                      onClick={() => {
+                        if (!stackView && orderedFloors.length > 0) setFloor(orderedFloors[0].floor)
+                        setStackView((value) => !value)
+                      }}
+                    >
+                      {stackView ? 'Ver un piso' : 'Ver todos los pisos'}
+                    </button>
+                    <button
+                      ref={filtersButtonRef}
+                      type="button"
+                      className={`filters-button${activeFilterCount > 0 ? ' has-active' : ''}`}
+                      aria-expanded={filtersOpen}
+                      aria-controls="filters-drawer"
+                      onClick={() => setFiltersOpen((value) => !value)}
+                    >
+                      <Icon name="filter" />
+                      Filtros
+                      {activeFilterCount > 0 && (
+                        <span
+                          className="filters-badge"
+                          aria-label={`${activeFilterCount} ${activeFilterCount === 1 ? 'filtro activo' : 'filtros activos'}`}
+                        >
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </button>
+                  </>
                 )}
                 {adminMapActive && (
                   <div className="floor-admin-controls" aria-label="Administrar niveles">
@@ -866,7 +888,7 @@ function App() {
                 <h2>Detalle del espacio</h2>
                 <span className="detail-icon" aria-hidden="true"><Icon name="current-location" /></span>
               </div>
-              {selectedSpace ? (
+{selectedSpace ? (
                 <div className="selected-details">
                   <span className={`type-tag ${getSpaceColorClass(selectedSpace.type, selectedSpace.category)}`}>
                     <SpaceIcon type={selectedSpace.type} category={selectedSpace.category} />
@@ -875,22 +897,12 @@ function App() {
                       : selectedSpace.type}
                   </span>
                   <h3>{getSpaceLabel(selectedSpace)}</h3>
-                  <p className="space-code">Código · {selectedSpace.id}</p>
-                  <div className="detail-divider" />
-                  <div className="detail-row">
-                    <span>Piso</span><strong>{selectedSpace.floor}</strong>
-                  </div>
-                  {selectedSpace.capacity && (
-                    <div className="detail-row">
-                      <span>Capacidad referencial</span><strong>{selectedSpace.capacity} personas</strong>
-                    </div>
+                  {(selectedSpace.type === 'Sala' || selectedSpace.type === 'Laboratorio') && (
+                    <p className="space-code">
+                      Código · {selectedSpace.customCode || suggestSpaceCode(selectedSpace)}
+                    </p>
                   )}
-                  <div className="detail-row">
-                    <span>Accesibilidad</span>
-                    <strong className={selectedSpace.accessible ? 'value-yes' : 'value-no'}>
-                      {selectedSpace.accessible ? 'Accesible' : 'No indicada'}
-                    </strong>
-                  </div>
+                  <div className="detail-divider" />
                   {selectedSpace.description && (
                     <p className="space-description">{selectedSpace.description}</p>
                   )}
@@ -907,37 +919,18 @@ function App() {
 
             <section className="search-panel" aria-label="Buscar espacios">
               <label className="search-field">
-                <span className="search-icon" aria-hidden="true"><Icon name="search" /></span>
-                <span className="sr-only">Buscar por nombre, código, tipo o categoría</span>
-                <input
-                  type="search"
-                  placeholder="¿Qué espacio o categoría buscas?"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-                <kbd aria-hidden="true"><Icon name="corner-down-left" /></kbd>
+                Buscar una sala o categoría
+                <div className="search-input-box">
+                  <span className="search-icon" aria-hidden="true"><Icon name="search" /></span>
+                  <input
+                    type="search"
+                    placeholder="Ej: B203, L-03-P02-B, Laboratorio"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value.toUpperCase())}
+                  />
+                  <kbd aria-hidden="true"><Icon name="corner-down-left" /></kbd>
+                </div>
               </label>
-              <div className="search-filters">
-                <button
-                  ref={filtersButtonRef}
-                  type="button"
-                  className={`filters-button${activeFilterCount > 0 ? ' has-active' : ''}`}
-                  aria-expanded={filtersOpen}
-                  aria-controls="filters-drawer"
-                  onClick={() => setFiltersOpen((value) => !value)}
-                >
-                  <Icon name="filter" />
-                  Filtros
-                  {activeFilterCount > 0 && (
-                    <span
-                      className="filters-badge"
-                      aria-label={`${activeFilterCount} ${activeFilterCount === 1 ? 'filtro activo' : 'filtros activos'}`}
-                    >
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </button>
-              </div>
             </section>
 
             <section className="results-card">

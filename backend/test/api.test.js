@@ -376,6 +376,7 @@ test('admin can list slots and persist all editable room details', async () => {
     accessible: true,
     capacity: null,
     description: 'Acceso por el pasillo norte.',
+    customCode: null,
   })
 
   const publicResponse = await fetch(`${baseUrl}/api/spaces?type=Espacio%20com%C3%BAn`)

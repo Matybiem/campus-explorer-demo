@@ -11,6 +11,7 @@ export const spaceTypes = new Set([
   'Laboratorio',
   'Administrativo',
   'Espacio común',
+  'Otro',
 ])
 const spaceCategories = new Set(['Baño hombre', 'Baño mujer', 'Escalera', 'Ascensor', 'Comida'])
 
@@ -189,7 +190,7 @@ export function createApp({ repositories, sessionStore, sessionSecret, secureCoo
   }))
 
   app.patch('/api/admin/slots/:id', requireAdmin, asyncRoute(async (request, response) => {
-    const { name, type, category: requestedCategory, enabled, useContour, accessible, description } = request.body ?? {}
+    const { name, type, category: requestedCategory, enabled, useContour, accessible, description, customCode } = request.body ?? {}
     const category = requestedCategory ?? null
     if (typeof name !== 'string' || name.trim().length > 60) {
       response.status(400).json({ error: 'El nombre debe tener como máximo 60 caracteres.' })
@@ -219,6 +220,11 @@ export function createApp({ repositories, sessionStore, sessionSecret, secureCoo
       response.status(400).json({ error: 'La descripción debe tener como máximo 500 caracteres.' })
       return
     }
+    const normalizedCustomCode = customCode != null ? String(customCode).trim() : null
+    if (normalizedCustomCode !== null && normalizedCustomCode.length > 20) {
+      response.status(400).json({ error: 'El código personalizado debe tener como máximo 20 caracteres.' })
+      return
+    }
 
     const updatedSlot = await repositories.updateSlot(request.params.id, {
       name: type === 'Espacio común' ? '' : name.trim(),
@@ -228,6 +234,7 @@ export function createApp({ repositories, sessionStore, sessionSecret, secureCoo
       useContour: enabled || useContour,
       accessible,
       description: description.trim(),
+      customCode: (type === 'Sala' || type === 'Laboratorio') ? normalizedCustomCode : null,
     })
     if (!updatedSlot) {
       response.status(404).json({ error: 'No se encontró la casilla solicitada.' })
@@ -289,6 +296,11 @@ export function createApp({ repositories, sessionStore, sessionSecret, secureCoo
         response.status(400).json({ error: 'Cada descripción debe tener como máximo 500 caracteres.' })
         return
       }
+      const slotCustomCode = slot.customCode != null ? String(slot.customCode).trim() : null
+      if (slotCustomCode !== null && slotCustomCode.length > 20) {
+        response.status(400).json({ error: 'Cada código personalizado debe tener como máximo 20 caracteres.' })
+        return
+      }
 
       slotIds.add(slot.id)
       updates.push({
@@ -300,6 +312,7 @@ export function createApp({ repositories, sessionStore, sessionSecret, secureCoo
         useContour: slot.enabled || slot.useContour,
         accessible: slot.accessible,
         description: slot.description.trim(),
+        customCode: (slot.type === 'Sala' || slot.type === 'Laboratorio') ? slotCustomCode : null,
       })
     }
 

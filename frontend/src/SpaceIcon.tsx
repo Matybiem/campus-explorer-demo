@@ -7,9 +7,10 @@ type SpaceIconProps = {
 }
 
 const typeIcons: Record<Exclude<SpaceType, 'Espacio común'>, IconName> = {
-  Sala: 'chalkboard',
+  Sala: 'glasses',
   Laboratorio: 'device-desktop',
   Administrativo: 'briefcase',
+  Otro: 'users-group',
 }
 
 const categoryIcons: Record<SpaceCategory, IconName> = {
@@ -23,6 +24,10 @@ const categoryIcons: Record<SpaceCategory, IconName> = {
 function SpaceIcon({ type, category }: SpaceIconProps) {
   if (type === 'Espacio común') {
     return <Icon name={category ? categoryIcons[category] : 'question-mark'} />
+  }
+
+  if (type === 'Otro') {
+    return <Icon name={typeIcons[type]} className="room-other" />
   }
 
   return <Icon name={typeIcons[type]} />

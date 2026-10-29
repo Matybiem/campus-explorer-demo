@@ -32,6 +32,69 @@ git switch --track origin/feature/fixed-floor-matrix-contour
 - Git
 - Docker Desktop con Docker Compose, para la base de datos local
 
+---
+
+## Etapa 1: Preparar el repositorio local y crear Pull Request
+
+Sigue estos pasos antes de desplegar en TrueNAS. Todo el desarrollo se hace en ramas de feature y se integra mediante pull requests.
+
+### 1.1 Clonar el repositorio y crear una rama de feature
+
+```powershell
+git clone https://github.com/Matybiem/campus-explorer-demo.git
+cd campus-explorer-demo
+git checkout -b feature/tu-nombre-de-funcionalidad
+```
+
+### 1.2 Hacer los cambios en el código
+
+Modifica los archivos necesarios (frontend, backend, configuración Docker, documentación, etc.).
+
+### 1.3 Verificar que todo funcione localmente
+
+```powershell
+# Backend: pruebas
+npm test --prefix backend
+
+# Frontend: build y typecheck
+npm run build --prefix frontend
+```
+
+### 1.4 Commit y push de la rama
+
+```powershell
+git add .
+git commit -m "feat: descripción breve del cambio"
+git push origin feature/tu-nombre-de-funcionalidad
+```
+
+### 1.5 Crear el Pull Request en GitHub
+
+1. Ve a https://github.com/Matybiem/campus-explorer-demo
+2. Haz clic en **"Compare & pull request"** (aparece automáticamente después del push)
+3. Selecciona:
+   - **base:** `main`
+   - **compare:** `feature/tu-nombre-de-funcionalidad`
+4. Agrega título y descripción del PR
+5. Haz clic en **"Create pull request"**
+
+### 1.6 Revisión y merge del PR
+
+1. Un revisor aprueba los cambios
+2. Se resuelven comentarios si los hay
+3. Se hace **"Merge pull request"** → **"Merge commit"**
+4. La rama se puede eliminar después del merge
+
+### 1.7 Sincronizar tu rama local con main
+
+```powershell
+git checkout main
+git pull origin main
+git branch -d feature/tu-nombre-de-funcionalidad
+```
+
+---
+
 ## Puesta en marcha local
 
 ### Configurar credenciales locales
@@ -109,7 +172,9 @@ frontend/
 
 ## Funcionalidades
 
-- Búsqueda por nombre, código o tipo de espacio.
+- Búsqueda por nombre, código o tipo de espacio (incluye códigos asociados como `S-05-P04-A`).
+- Códigos de sala/laboratorio con formato estándar: `[Tipo]-[Número]-[Piso]-[Ala]` (ej: `S-05-P04-A`, `L-03-S02-B` para sótanos con guion).
+- Tipo de espacio 'Otro' con icono de usuarios en celeste (#24EAFF).
 - Filtros por tipo, categoría y accesibilidad desde un panel lateral con botonera («Filtros»).
 - Selección de piso y espacios en el plano o en la lista.
 - Panel con detalles ficticios del espacio seleccionado.
@@ -140,7 +205,7 @@ El mapa muestra los espacios de un piso sobre una cuadrícula fija, con la super
 - **Pasto:** en el Piso 1 (el nivel de calle) las casillas de la matriz que no pertenecen al contorno activo se cubren con una capa verde translúcida, igual que las paredes, para diferenciarlo de los subterráneos. El botón «Pasto» del panel de filtros lo muestra u oculta; empieza visible. No aparece en ningún otro nivel, y en la vista de todos los pisos solo se dibuja sobre el Piso 1.
 - **Selector de nivel:** lista solo los niveles activos, de arriba hacia abajo: Piso 4, Piso 3, Piso 2, Piso 1, Subterráneo 1, Subterráneo 2.
 - **Selección:** un clic sobre una sala la resalta y muestra su detalle.
-- **Tipos y categorías:** cada tipo de espacio y cada categoría de espacio común tiene su propio color e icono. Todos los iconos de la interfaz son de Tabler Icons, en estilo de contorno.
+- **Tipos y categorías:** cada tipo de espacio y cada categoría de espacio común tiene su propio color e icono. Todos los iconos de la interfaz son de Tabler Icons, en estilo de contorno. El tipo 'Otro' usa el icono de usuarios en celeste (#24EAFF). El tipo 'Sala' usa el icono de gafas.
 
 ### RF-02 Navegación del mapa
 
@@ -171,9 +236,9 @@ El botón «Ver todos los pisos» muestra todos los niveles activos apilados en 
 
 El usuario encuentra espacios por texto y con filtros, en todos los pisos a la vez.
 
-- **Búsqueda:** el campo de texto busca por nombre, código, tipo o categoría, sin distinguir mayúsculas y minúsculas.
+- **Búsqueda:** el campo de texto busca por nombre, código, código asociado (`customCode`), tipo o categoría, sin distinguir mayúsculas y minúsculas. Si el espacio no tiene código asociado guardado, se sugiere automáticamente desde el nombre y el piso.
 - **Alcance:** la búsqueda recorre todos los pisos, no solo el seleccionado.
-- **Filtros:** el botón «Filtros», debajo del campo de búsqueda, abre un panel lateral derecho con una botonera de once botones: Sala, Laboratorio, Administrativo, Baño hombre, Baño mujer, Escalera, Ascensor, Comida, Accesible, Paredes y Pasto. Los botones de tipo y categoría activos se ven a color (con el color e icono de cada uno) y los desactivados en gris. Al abrir el panel están todos activos, de modo que se muestran todos los espacios; al desactivar uno, sus espacios se ocultan. «Accesible» empieza desactivado y, al activarlo, solo se muestran los espacios accesibles. «Paredes» y «Pasto» no filtran espacios: son opciones de vista que muestran u ocultan las paredes y el pasto del mapa (empiezan activas); no cuentan en la insignia ni se restablecen con «Restablecer filtros».
+- **Filtros:** el botón «Filtros», a la derecha de «Ver todos los pisos», abre un panel lateral derecho con una botonera de once botones: Sala, Laboratorio, Administrativo, Baño hombre, Baño mujer, Escalera, Ascensor, Comida, Accesible, Paredes y Pasto. Los botones de tipo y categoría activos se ven a color (con el color e icono de cada uno) y los desactivados en gris. Al abrir el panel están todos activos, de modo que se muestran todos los espacios; al desactivar uno, sus espacios se ocultan. «Accesible» empieza desactivado y, al activarlo, solo se muestran los espacios accesibles. «Paredes» y «Pasto» no filtran espacios: son opciones de vista que muestran u ocultan las paredes y el pasto del mapa (empiezan activas); no cuentan en la insignia ni se restablecen con «Restablecer filtros».
 - **Panel de filtros:** Se cierra con el botón ✕, con la tecla Esc, al hacer clic fuera del panel o volviendo a pulsar «Filtros». No oscurece la página, así que el mapa y los resultados se actualizan mientras se eligen los filtros. Incluye el número de resultados y el botón «Restablecer filtros».
 - **Indicador:** el botón «Filtros» muestra una insignia con el número de filtros activos (tipos desactivados más «Accesible»); sin insignia, no hay ninguno.
 - **Resultados:** la lista muestra el icono, el nombre, el tipo y el nivel de cada espacio, junto con el número de resultados.
@@ -186,7 +251,7 @@ El usuario encuentra espacios por texto y con filtros, en todos los pisos a la v
 Al seleccionar un espacio, el panel lateral muestra su información.
 
 - **Encabezado:** una etiqueta con el tipo, con su icono y color (para un espacio común incluye la categoría), y el nombre del espacio. Si no tiene nombre, se muestra su código.
-- **Datos:** código, piso y capacidad referencial (solo si existe).
+- **Datos:** código, código asociado (si existe), piso y capacidad referencial (solo si existe).
 - **Accesibilidad:** indica «Accesible» o «No indicada».
 - **Descripción:** se muestra entre la accesibilidad y la nota de información ficticia.
 - **Ver en el mapa:** el botón «Ver … en el mapa» cambia al piso del espacio y lo selecciona.
@@ -211,6 +276,7 @@ El administrador edita cualquiera de las 225 casillas del piso, incluidas las oc
 - **Tipo:** se elige primero el tipo: Sala, Laboratorio, Administrativo o Espacio común.
 - **Nombre:** es opcional y admite hasta 60 caracteres. Si queda vacío, se muestra el código de la casilla.
 - **Categoría:** para un Espacio común, el nombre se reemplaza por una categoría obligatoria: Baño hombre, Baño mujer, Escalera, Ascensor o Comida. Cada una se elige en un desplegable con su icono y color.
+- **Código de sala:** para Sala y Laboratorio, aparece un campo «Código de sala» que sugiere automáticamente un código con formato `[Tipo]-[Número]-[Piso]-[Ala]` (ej: `S-05-P04-A`). El administrador puede editarlo manualmente o dejarlo vacío para usar el sugerido.
 - **Accesibilidad:** la casilla «Espacio accesible» marca si el espacio es accesible.
 - **Usar contorno:** decide si una casilla oculta forma parte de la superficie del piso. Mientras la casilla es visible, esta opción queda marcada y no se puede desmarcar. Se conserva al ocultarla.
 - **Descripción:** texto opcional de hasta 500 caracteres.
@@ -266,7 +332,7 @@ Los niveles y casillas se almacenan en PostgreSQL. Los pisos usan los números 1
 | --- | --- | --- |
 | `id` | texto | Identificador único del espacio |
 | `name` | texto | Nombre que se muestra |
-| `type` | `Sala`, `Laboratorio`, `Administrativo` o `Espacio común` | Tipo principal |
+| `type` | `Sala`, `Laboratorio`, `Administrativo`, `Espacio común` o `Otro` | Tipo principal |
 | `category` | `Baño hombre`, `Baño mujer`, `Escalera`, `Ascensor` o `Comida`; nulo para otros tipos | Subcategoría de un espacio común, con su icono y color |
 | `floor` | número entero | Piso |
 | `x`, `y` | número entero entre 0 y 14 | Columna y fila en la matriz fija de 15 × 15 |
@@ -275,6 +341,7 @@ Los niveles y casillas se almacenan en PostgreSQL. Los pisos usan los números 1
 | `capacity` | número, opcional | Capacidad referencial ficticia |
 | `accessible` | booleano | Indica accesibilidad en los datos de ejemplo |
 | `description` | texto | Descripción del espacio |
+| `custom_code` | texto, opcional | Código asociado personalizado para Sala o Laboratorio (formato: `S-05-P04-A`) |
 
 La interfaz de administración permite seleccionar primero el tipo principal y luego editar el nombre; para «Espacio común», el nombre se reemplaza por una categoría seleccionable (baño hombre, baño mujer, escalera, ascensor o comida). Cada categoría tiene su propio icono y color. Los cambios de nombre, tipo, categoría, visibilidad, accesibilidad y descripción quedan pendientes hasta guardar juntos todos los cambios del piso. Las descripciones admiten hasta 500 caracteres y se muestran en los detalles públicos debajo de la accesibilidad. No permite cerrar la administración ni cambiar de piso hasta guardar los cambios. Las casillas desactivadas no aparecen en el mapa público. Si cambia el contrato, actualiza PostgreSQL, los repositorios, `frontend/src/types.ts`, la validación API y las pruebas afectadas.
 
@@ -297,7 +364,7 @@ En administración, las casillas visibles siempre pertenecen a la superficie del
 - `PATCH /api/admin/floors/:floor/active`: agrega o desactiva un piso/subterráneo siguiendo el orden y los límites establecidos; requiere sesión admin.
 - `PATCH /api/admin/slots/:id`: guarda una casilla individual; `name` es opcional y admite hasta 60 caracteres; requiere sesión admin.
 
-Los tipos principales admitidos son `Sala`, `Laboratorio`, `Administrativo` y `Espacio común`. Los espacios comunes requieren una categoría de `Baño hombre`, `Baño mujer`, `Escalera`, `Ascensor` o `Comida`; los tipos de baño independientes ya no se aceptan. La migración convierte los tipos de baño existentes en espacios comunes y conserva su categoría. Los filtros inválidos devuelven estado HTTP `400` con un mensaje JSON. Las rutas de edición requieren sesión y las contraseñas no se envían al frontend después del login.
+Los tipos principales admitidos son `Sala`, `Laboratorio`, `Administrativo`, `Espacio común` y `Otro`. Los espacios comunes requieren una categoría de `Baño hombre`, `Baño mujer`, `Escalera`, `Ascensor` o `Comida`; los tipos de baño independientes ya no se aceptan. La migración convierte los tipos de baño existentes en espacios comunes y conserva su categoría. Los filtros inválidos devuelven estado HTTP `400` con un mensaje JSON. Las rutas de edición requieren sesión y las contraseñas no se envían al frontend después del login. Para `Sala` y `Laboratorio`, el campo `custom_code` permite guardar un código asociado personalizado; si está vacío, se genera automáticamente desde el nombre y el piso.
 
 ## Pruebas y compilación
 

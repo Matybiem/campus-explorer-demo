@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { spaces } from './data/spaces.js'
 
-const spaceTypes = ['Sala', 'Laboratorio', 'Administrativo', 'Espacio común']
+const spaceTypes = ['Sala', 'Laboratorio', 'Administrativo', 'Espacio común', 'Otro']
 const spaceCategories = ['Baño hombre', 'Baño mujer', 'Escalera', 'Ascensor', 'Comida']
 const legacyBathroomTypes = ['Baño hombre', 'Baño mujer']
 const matrixSize = 15
@@ -208,6 +208,8 @@ export async function initializeDatabase(pool, { adminUsername, adminPassword })
       ADD COLUMN IF NOT EXISTS use_contour BOOLEAN NOT NULL DEFAULT FALSE;
     ALTER TABLE space_slots
       ADD COLUMN IF NOT EXISTS category VARCHAR(30);
+    ALTER TABLE space_slots
+      ADD COLUMN IF NOT EXISTS custom_code VARCHAR(20);
     ALTER TABLE space_slots DROP CONSTRAINT IF EXISTS space_slots_floor_check;
     ALTER TABLE space_slots
       ADD CONSTRAINT space_slots_floor_check

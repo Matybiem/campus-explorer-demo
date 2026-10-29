@@ -1,20 +1,55 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import AdminPanel from './AdminPanel'
+import FiltersPanel from './FiltersPanel'
+import { Icon } from './icons'
 import SpaceIcon from './SpaceIcon'
 import { fetchFloorPlan, fetchFloors, fetchSpaces } from './api'
 import { setAdminFloorActive } from './adminApi'
-import { floorLabel, getSpaceColorClass, getSpaceLabel, spaceTypes, type AdminSlot, type ContourCell, type FloorPlan, type Space } from './types'
+import { floorLabel, getSpaceColorClass, getSpaceKindKey, getSpaceLabel, spaceKinds, type AdminSlot, type ContourCell, type FloorPlan, type Space } from './types'
 
 const defaultView = { rotation: -39, tilt: 61, zoom: 60 }
 const flatView = { rotation: 0, tilt: 0, zoom: 55 }
 const matrixSize = 15
 const mapCellSize = 60
+const wallHeight = mapCellSize
 const mapCanvasPadding = 240
 const slotDragDelayMs = 400
-const stackLayerGap = 45
+const orbitThresholdPx = 5
+const orbitDegreesPerPixel = 0.4
+const minZoom = 20
+const maxZoom = 140
+const wheelZoomPerPixel = 0.05
+const stackLayerGap = wallHeight
 const stackSelectedGap = 130
 const stackFit = 1
 const svgCellSize = 100
+const groundFloor = 1
+
+function getGrassPath(cells: ContourCell[]) {
+  const occupied = new Set(cells.map(({ x, y }) => `${x}:${y}`))
+  let path = ''
+
+  for (let y = 0; y < matrixSize; y += 1) {
+    for (let x = 0; x < matrixSize; x += 1) {
+      if (occupied.has(`${x}:${y}`)) continue
+      path += `M${x * svgCellSize} ${y * svgCellSize}h${svgCellSize}v${svgCellSize}h-${svgCellSize}z`
+    }
+  }
+
+  return path
+}
+
+function FloorGrass({ cells }: { cells: ContourCell[] }) {
+  return (
+    <svg
+      className="floor-grass"
+      viewBox={`0 0 ${matrixSize * svgCellSize} ${matrixSize * svgCellSize}`}
+      aria-hidden="true"
+    >
+      <path d={getGrassPath(cells)} />
+    </svg>
+  )
+}
 
 function getContourPaths(cells: ContourCell[]) {
   const occupied = new Set(
@@ -39,14 +74,109 @@ function getContourPaths(cells: ContourCell[]) {
   return { fillPath, outlinePath }
 }
 
+type ContourWall = {
+  key: string
+  orientation: 'horizontal' | 'vertical'
+  line: number
+  start: number
+  length: number
+}
+
+function getContourWalls(cells: ContourCell[]): ContourWall[] {
+  const occupied = new Set(
+    cells
+      .filter(({ x, y }) => Number.isInteger(x) && Number.isInteger(y) && x >= 0 && x < matrixSize && y >= 0 && y < matrixSize)
+      .map(({ x, y }) => `${x}:${y}`),
+  )
+  const horizontal = new Map<number, number[]>()
+  const vertical = new Map<number, number[]>()
+  const addEdge = (edges: Map<number, number[]>, line: number, position: number) => {
+    edges.set(line, [...(edges.get(line) ?? []), position])
+  }
+
+  for (const cell of occupied) {
+    const [x, y] = cell.split(':').map(Number)
+    if (!occupied.has(`${x}:${y - 1}`)) addEdge(horizontal, y, x)
+    if (!occupied.has(`${x}:${y + 1}`)) addEdge(horizontal, y + 1, x)
+    if (!occupied.has(`${x - 1}:${y}`)) addEdge(vertical, x, y)
+    if (!occupied.has(`${x + 1}:${y}`)) addEdge(vertical, x + 1, y)
+  }
+
+  const walls: ContourWall[] = []
+  const mergeRuns = (edges: Map<number, number[]>, orientation: ContourWall['orientation']) => {
+    for (const [line, positions] of edges) {
+      const sorted = [...positions].sort((a, b) => a - b)
+      let start = sorted[0]
+      let previous = sorted[0]
+      for (const position of [...sorted.slice(1), Infinity]) {
+        if (position === previous + 1) {
+          previous = position
+          continue
+        }
+        walls.push({ key: `${orientation}-${line}-${start}`, orientation, line, start, length: previous - start + 1 })
+        start = position
+        previous = position
+      }
+    }
+  }
+  mergeRuns(horizontal, 'horizontal')
+  mergeRuns(vertical, 'vertical')
+
+  return walls
+}
+
+function FloorWalls({ walls }: { walls: ContourWall[] }) {
+  return (
+    <div className="floor-walls" aria-hidden="true">
+      {walls.map((wall) => (
+        <span
+          key={wall.key}
+          className={`floor-wall floor-wall-${wall.orientation}`}
+          style={wall.orientation === 'horizontal'
+            ? {
+              left: `${wall.start * mapCellSize}px`,
+              top: `${wall.line * mapCellSize}px`,
+              width: `${wall.length * mapCellSize}px`,
+              height: `${wallHeight}px`,
+            }
+            : {
+              left: `${wall.line * mapCellSize}px`,
+              top: `${wall.start * mapCellSize}px`,
+              width: `${wallHeight}px`,
+              height: `${wall.length * mapCellSize}px`,
+            }}
+        />
+      ))}
+    </div>
+  )
+}
+
+/** Genera un código legible para sala/laboratorio desde su nombre y piso.
+ *  Formato: [S|L]-[2 últimos dígitos]-P[2 dígitos piso]-[Ala]
+ *  Ejemplo: nombre "A405", piso 4, tipo Sala → S-05-P04-A
+ */
+function suggestSpaceCode(space: { name: string; floor: number; type: string }): string {
+  const prefix = space.type === 'Laboratorio' ? 'L' : 'S'
+  const match = space.name.trim().match(/^([A-Za-z])(\d{3})/)
+  if (!match) return ''
+  const wing = match[1].toUpperCase()
+  const roomDigits = match[2].slice(1)
+  const hasDash = space.name.includes('-')
+  const floorStr = space.floor < 0 && hasDash ? `S${String(Math.abs(space.floor)).padStart(2, '0')}` : `P${String(space.floor < 0 ? Math.abs(space.floor) : space.floor).padStart(2, '0')}`
+  return `${prefix}-${roomDigits}-${floorStr}-${wing}`
+}
 function App() {
   const [spaces, setSpaces] = useState<Space[]>([])
   const [loading, setLoading] = useState(true)
   const [apiError, setApiError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [query, setQuery] = useState('')
-  const [typeFilter, setTypeFilter] = useState('Todos')
+  const [activeKinds, setActiveKinds] = useState<ReadonlySet<string>>(() => new Set(spaceKinds.map((kind) => kind.key)))
   const [accessibleOnly, setAccessibleOnly] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const [showWalls, setShowWalls] = useState(true)
+  const [showGrass, setShowGrass] = useState(true)
+  const filtersButtonRef = useRef<HTMLButtonElement>(null)
   const [floor, setFloor] = useState(1)
   const [floors, setFloors] = useState<FloorPlan[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -65,6 +195,8 @@ function App() {
   const [tilt, setTilt] = useState(defaultView.tilt)
   const [zoom, setZoom] = useState(defaultView.zoom)
   const panRef = useRef<{ x: number; y: number; left: number; top: number } | null>(null)
+  const orbitRef = useRef<{ x: number; y: number; rotation: number; tilt: number; active: boolean } | null>(null)
+  const orbitedRef = useRef(false)
   const viewportRef = useRef<HTMLDivElement>(null)
   const [stackView, setStackView] = useState(false)
 
@@ -74,6 +206,19 @@ function App() {
     viewport.scrollLeft = (viewport.scrollWidth - viewport.clientWidth) / 2
     viewport.scrollTop = (viewport.scrollHeight - viewport.clientHeight) / 2
   }, [stackView])
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      setZoom((value) => Math.max(minZoom, Math.min(maxZoom, Math.round(value - event.deltaY * wheelZoomPerPixel))))
+    }
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false })
+    return () => viewport.removeEventListener('wheel', handleWheel)
+  }, [])
   const [stackContours, setStackContours] = useState<Record<number, ContourCell[]>>({})
   const swapSlotsRef = useRef<((fromId: string, toId: string) => void) | null>(null)
   const dragTimerRef = useRef<number | null>(null)
@@ -106,10 +251,10 @@ function App() {
       setDragOverId(null)
     }
     const handleMove = (moveEvent: PointerEvent) => {
-      if (dragTimerRef.current === null) setDragOverId(slotIdAtPoint(moveEvent.clientX, moveEvent.clientY))
+      if (dragTimerRef.current === null && !orbitedRef.current) setDragOverId(slotIdAtPoint(moveEvent.clientX, moveEvent.clientY))
     }
     const handleUp = (upEvent: PointerEvent) => {
-      const dragging = dragTimerRef.current === null
+      const dragging = dragTimerRef.current === null && !orbitedRef.current
       const targetId = slotIdAtPoint(upEvent.clientX, upEvent.clientY)
       cleanup()
       if (!dragging) return
@@ -182,20 +327,37 @@ function App() {
   }, [stackView, floors, reloadKey])
 
   const filteredSpaces = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase('es')
+    const normalizedQuery = query.trim().toUpperCase()
 
     return spaces.filter((space) => {
-      const matchesType = typeFilter === 'Todos' || space.type === typeFilter
+      const matchesType = activeKinds.has(getSpaceKindKey(space))
       const matchesAccessibility = !accessibleOnly || space.accessible
       const matchesQuery =
         !normalizedQuery ||
-        `${space.id} ${space.name} ${space.type} ${space.category ?? ''}`
-          .toLocaleLowerCase('es')
+        `${space.id} ${space.name} ${space.type} ${space.category ?? ''} ${space.customCode ?? suggestSpaceCode(space)}`
+          .toUpperCase()
           .includes(normalizedQuery)
 
       return matchesType && matchesAccessibility && matchesQuery
     })
-  }, [accessibleOnly, query, spaces, typeFilter])
+  }, [accessibleOnly, activeKinds, query, spaces])
+
+  const activeFilterCount = spaceKinds.length - activeKinds.size + (accessibleOnly ? 1 : 0)
+  const closeFilters = useCallback((restoreFocus: boolean) => {
+    setFiltersOpen(false)
+    if (restoreFocus) filtersButtonRef.current?.focus()
+  }, [])
+  const toggleKind = useCallback((key: string) => {
+    setActiveKinds((current) => {
+      const next = new Set(current)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
+  }, [])
+  const resetFilters = useCallback(() => {
+    setActiveKinds(new Set(spaceKinds.map((kind) => kind.key)))
+    setAccessibleOnly(false)
+  }, [])
 
   const selectedSpace = spaces.find((space) => space.id === selectedId)
   const adminMapActive = adminOpen && adminSlots !== null
@@ -266,6 +428,7 @@ function App() {
       .filter((slot) => slot.enabled || slot.useContour)
     : floorPlan.contourCells ?? []
   const { fillPath, outlinePath } = getContourPaths(contourCells)
+  const contourWalls = getContourWalls(contourCells)
   const rotationRadians = rotation * Math.PI / 180
   const tiltScale = Math.cos(tilt * Math.PI / 180)
   const stackActive = stackView && !adminMapActive
@@ -276,7 +439,7 @@ function App() {
   const stackTotalHeight = Math.max(0, stackFloors.length - 1) * stackLayerGap +
     (hasFloorsAbove ? stackSelectedGap : 0)
   const stackExtraHeight = stackActive
-    ? stackTotalHeight * Math.sin(tilt * Math.PI / 180) * zoomScale
+    ? (stackTotalHeight + (showWalls ? wallHeight : 0)) * Math.sin(tilt * Math.PI / 180) * zoomScale
     : 0
   const mapCanvasWidth = Math.ceil(
     (Math.abs(Math.cos(rotationRadians)) * planWidth +
@@ -319,19 +482,6 @@ function App() {
       </header>
 
       <main id="inicio" className="page-content">
-        <section className="intro">
-          <div>
-            <p className="eyebrow">EXPLORA A TU MANERA</p>
-            <h1>Encuentra tu próximo espacio</h1>
-            <p className="intro-copy">
-              Explora un campus de ejemplo y encuentra salas y servicios sin perderte.
-            </p>
-          </div>
-          <div className="campus-chip">
-            <span className="campus-icon" aria-hidden="true">⌂</span>
-            Campus de demostración
-          </div>
-        </section>
 
         {(loading || apiError) && (
           <div className={`api-status${apiError ? ' api-status-error' : ''}`} role="status">
@@ -368,17 +518,41 @@ function App() {
                       <option key={item.floor} value={item.floor}>{floorLabel(item.floor)}</option>
                     ))}
                   </select>
-                  <span aria-hidden="true">⌄</span>
+                  <span aria-hidden="true"><Icon name="chevron-down" /></span>
                 </label>
                 {!adminMapActive && (
-                  <button
-                    type="button"
-                    className={`stack-toggle${stackView ? ' is-active' : ''}`}
-                    aria-pressed={stackView}
-                    onClick={() => setStackView((value) => !value)}
-                  >
-                    {stackView ? 'Ver un piso' : 'Ver todos los pisos'}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className={`stack-toggle${stackView ? ' is-active' : ''}`}
+                      aria-pressed={stackView}
+                      onClick={() => {
+                        if (!stackView && orderedFloors.length > 0) setFloor(orderedFloors[0].floor)
+                        setStackView((value) => !value)
+                      }}
+                    >
+                      {stackView ? 'Ver un piso' : 'Ver todos los pisos'}
+                    </button>
+                    <button
+                      ref={filtersButtonRef}
+                      type="button"
+                      className={`filters-button${activeFilterCount > 0 ? ' has-active' : ''}`}
+                      aria-expanded={filtersOpen}
+                      aria-controls="filters-drawer"
+                      onClick={() => setFiltersOpen((value) => !value)}
+                    >
+                      <Icon name="filter" />
+                      Filtros
+                      {activeFilterCount > 0 && (
+                        <span
+                          className="filters-badge"
+                          aria-label={`${activeFilterCount} ${activeFilterCount === 1 ? 'filtro activo' : 'filtros activos'}`}
+                        >
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </button>
+                  </>
                 )}
                 {adminMapActive && (
                   <div className="floor-admin-controls" aria-label="Administrar niveles">
@@ -388,14 +562,14 @@ function App() {
                         type="button"
                         disabled={floorBusy || hasPendingAdminChanges || highestFloor >= 10}
                         onClick={() => void changeFloorActive(highestFloor + 1, true)}
-                      >＋ Piso</button>
+                      ><Icon name="plus" /> Piso</button>
                       <button
                         type="button"
                         disabled={floorBusy || hasPendingAdminChanges || highestFloor <= 1}
                         onClick={() => void changeFloorActive(highestFloor, false)}
                         aria-label={`Desactivar ${floorLabel(highestFloor)}`}
                         title={`Desactivar ${floorLabel(highestFloor)}`}
-                      >−</button>
+                      ><Icon name="minus" /></button>
                     </div>
                     <div>
                       <span>{activeBasements.length}/5 subterráneos</span>
@@ -403,14 +577,14 @@ function App() {
                         type="button"
                         disabled={floorBusy || hasPendingAdminChanges || deepestBasement <= -5}
                         onClick={() => void changeFloorActive(deepestBasement - 1, true)}
-                      >＋ Subterráneo</button>
+                      ><Icon name="plus" /> Subterráneo</button>
                       <button
                         type="button"
                         disabled={floorBusy || hasPendingAdminChanges || deepestBasement === 0}
                         onClick={() => void changeFloorActive(deepestBasement, false)}
                         aria-label={deepestBasement === 0 ? 'No hay subterráneos que desactivar' : `Desactivar ${floorLabel(deepestBasement)}`}
                         title={deepestBasement === 0 ? 'No hay subterráneos que desactivar' : `Desactivar ${floorLabel(deepestBasement)}`}
-                      >−</button>
+                      ><Icon name="minus" /></button>
                     </div>
                   </div>
                 )}
@@ -427,9 +601,24 @@ function App() {
                 tabIndex={0}
                 onContextMenu={(event) => event.preventDefault()}
                 onPointerDown={(event) => {
+                  const viewport = event.currentTarget
+                  if (event.button === 0) {
+                    const bounds = viewport.getBoundingClientRect()
+                    const onScrollbar = event.clientX - bounds.left >= viewport.clientWidth ||
+                      event.clientY - bounds.top >= viewport.clientHeight
+                    if (onScrollbar) return
+                    orbitedRef.current = false
+                    orbitRef.current = {
+                      x: event.clientX,
+                      y: event.clientY,
+                      rotation,
+                      tilt,
+                      active: false,
+                    }
+                    return
+                  }
                   if (event.button !== 2) return
                   event.preventDefault()
-                  const viewport = event.currentTarget
                   panRef.current = {
                     x: event.clientX,
                     y: event.clientY,
@@ -440,20 +629,49 @@ function App() {
                   viewport.classList.add('is-panning')
                 }}
                 onPointerMove={(event) => {
+                  const orbit = orbitRef.current
+                  if (orbit && !dragSourceId) {
+                    const deltaX = event.clientX - orbit.x
+                    const deltaY = event.clientY - orbit.y
+                    if (!orbit.active && Math.hypot(deltaX, deltaY) > orbitThresholdPx) {
+                      orbit.active = true
+                      orbitedRef.current = true
+                      cancelDragTimer()
+                      event.currentTarget.setPointerCapture(event.pointerId)
+                      event.currentTarget.classList.add('is-orbiting')
+                    }
+                    if (orbit.active) {
+                      setRotation(Math.max(-180, Math.min(180, Math.round(orbit.rotation + deltaX * orbitDegreesPerPixel))))
+                      setTilt(Math.max(0, Math.min(90, Math.round(orbit.tilt - deltaY * orbitDegreesPerPixel))))
+                      return
+                    }
+                  }
                   const pan = panRef.current
                   if (!pan) return
                   event.currentTarget.scrollLeft = pan.left - (event.clientX - pan.x)
                   event.currentTarget.scrollTop = pan.top - (event.clientY - pan.y)
                 }}
                 onPointerUp={(event) => {
+                  const orbit = orbitRef.current
+                  if (event.button === 0 && orbit) {
+                    orbitRef.current = null
+                    if (orbit.active) {
+                      suppressClickRef.current = true
+                      window.setTimeout(() => { suppressClickRef.current = false }, 0)
+                      event.currentTarget.classList.remove('is-orbiting')
+                      event.currentTarget.releasePointerCapture(event.pointerId)
+                    }
+                    return
+                  }
                   if (event.button !== 2 || !panRef.current) return
                   panRef.current = null
                   event.currentTarget.classList.remove('is-panning')
                   event.currentTarget.releasePointerCapture(event.pointerId)
                 }}
                 onPointerCancel={(event) => {
+                  orbitRef.current = null
                   panRef.current = null
-                  event.currentTarget.classList.remove('is-panning')
+                  event.currentTarget.classList.remove('is-panning', 'is-orbiting')
                 }}
               >
                 <div
@@ -492,6 +710,7 @@ function App() {
                               gridTemplateRows: `repeat(${floorPlan.verticalLength}, ${mapCellSize}px)`,
                             }}
                           >
+                            {showGrass && item.floor === groundFloor && <FloorGrass cells={stackContours[item.floor] ?? []} />}
                             <svg
                               className="floor-outline"
                               viewBox={`0 0 ${floorPlan.horizontalLength * svgCellSize} ${floorPlan.verticalLength * svgCellSize}`}
@@ -500,6 +719,7 @@ function App() {
                               <path className="floor-fill" d={layerContour.fillPath} />
                               <path className="floor-boundary" d={layerContour.outlinePath} />
                             </svg>
+                            {showWalls && <FloorWalls walls={getContourWalls(stackContours[item.floor] ?? [])} />}
                             {layerSpaces.map((space) => {
                               const matchesFilters = filteredSpaceIds.has(space.id)
                               const displayName = getSpaceLabel(space)
@@ -510,7 +730,10 @@ function App() {
                                   type="button"
                                   className={`map-space ${getSpaceColorClass(space.type, space.category)}${selectedId === space.id ? ' is-selected' : ''}${!matchesFilters ? ' is-muted' : ''}`}
                                   style={{ gridColumn: space.x + 1, gridRow: space.y + 1 }}
-                                  onClick={() => goToSpace(space)}
+                                  onClick={() => {
+                                    if (suppressClickRef.current) return
+                                    goToSpace(space)
+                                  }}
                                   disabled={!matchesFilters}
                                   aria-pressed={selectedId === space.id}
                                   aria-label={`${displayName}, ${space.type}, ${floorLabel(item.floor)}`}
@@ -538,6 +761,7 @@ function App() {
                       gridTemplateRows: `repeat(${floorPlan.verticalLength}, ${mapCellSize}px)`,
                     }}
                   >
+                    {showGrass && floor === groundFloor && <FloorGrass cells={contourCells} />}
                     <svg
                       className="floor-outline"
                       viewBox={`0 0 ${floorPlan.horizontalLength * svgCellSize} ${floorPlan.verticalLength * svgCellSize}`}
@@ -546,6 +770,7 @@ function App() {
                       <path className="floor-fill" d={fillPath} />
                       <path className="floor-boundary" d={outlinePath} />
                     </svg>
+                    {showWalls && <FloorWalls walls={contourWalls} />}
                     {floorSpaces.map((space) => {
                       const matchesFilters = filteredSpaceIds.has(space.id)
                       const hiddenInAdmin = adminMapActive && 'enabled' in space && !space.enabled
@@ -580,7 +805,7 @@ function App() {
                   )}
                 </div>
               </div>
-              <span className="north-indicator" aria-label="Norte">N <span>↑</span></span>
+              <span className="north-indicator" aria-label="Norte">N <span><Icon name="arrow-up" /></span></span>
               <div className="map-caption"><span /> {adminMapActive ? 'Casillas ocultas en gris' : 'Espacios de demostración'} · {floorLabel(floor)}</div>
             </div>
 
@@ -615,13 +840,15 @@ function App() {
                   type="button"
                   className="zoom-button"
                   aria-label="Alejar mapa"
-                  onClick={() => setZoom((value) => Math.max(20, value - 10))}
-                >−</button>
+                  onClick={() => setZoom((value) => Math.max(minZoom, value - 10))}
+                >
+                  <Icon name="minus" />
+                </button>
                 <input
                   id="zoom"
                   type="range"
-                  min="20"
-                  max="140"
+                  min={minZoom}
+                  max={maxZoom}
                   value={zoom}
                   onChange={(event) => setZoom(Number(event.target.value))}
                   aria-label={`Zoom: ${zoom} por ciento`}
@@ -630,11 +857,13 @@ function App() {
                   type="button"
                   className="zoom-button"
                   aria-label="Acercar mapa"
-                  onClick={() => setZoom((value) => Math.min(140, value + 10))}
-                >＋</button>
+                  onClick={() => setZoom((value) => Math.min(maxZoom, value + 10))}
+                >
+                  <Icon name="plus" />
+                </button>
               </div>
               <button type="button" className="reset-button" onClick={resetView}>
-                <span aria-hidden="true">↺</span> Restablecer vista
+                <span aria-hidden="true"><Icon name="refresh" /></span> Restablecer vista
               </button>
               <button type="button" className="reset-button" onClick={showFlatView}>
                 Vista plana
@@ -657,9 +886,9 @@ function App() {
             ) : <section className="detail-card" aria-live="polite">
               <div className="side-card-heading">
                 <h2>Detalle del espacio</h2>
-                <span className="detail-icon" aria-hidden="true">⌖</span>
+                <span className="detail-icon" aria-hidden="true"><Icon name="current-location" /></span>
               </div>
-              {selectedSpace ? (
+{selectedSpace ? (
                 <div className="selected-details">
                   <span className={`type-tag ${getSpaceColorClass(selectedSpace.type, selectedSpace.category)}`}>
                     <SpaceIcon type={selectedSpace.type} category={selectedSpace.category} />
@@ -668,22 +897,12 @@ function App() {
                       : selectedSpace.type}
                   </span>
                   <h3>{getSpaceLabel(selectedSpace)}</h3>
-                  <p className="space-code">Código · {selectedSpace.id}</p>
-                  <div className="detail-divider" />
-                  <div className="detail-row">
-                    <span>Piso</span><strong>{selectedSpace.floor}</strong>
-                  </div>
-                  {selectedSpace.capacity && (
-                    <div className="detail-row">
-                      <span>Capacidad referencial</span><strong>{selectedSpace.capacity} personas</strong>
-                    </div>
+                  {(selectedSpace.type === 'Sala' || selectedSpace.type === 'Laboratorio') && (
+                    <p className="space-code">
+                      Código · {selectedSpace.customCode || suggestSpaceCode(selectedSpace)}
+                    </p>
                   )}
-                  <div className="detail-row">
-                    <span>Accesibilidad</span>
-                    <strong className={selectedSpace.accessible ? 'value-yes' : 'value-no'}>
-                      {selectedSpace.accessible ? 'Accesible' : 'No indicada'}
-                    </strong>
-                  </div>
+                  <div className="detail-divider" />
                   {selectedSpace.description && (
                     <p className="space-description">{selectedSpace.description}</p>
                   )}
@@ -691,7 +910,7 @@ function App() {
                 </div>
               ) : (
                 <div className="empty-detail">
-                  <span className="empty-detail-icon" aria-hidden="true">⌖</span>
+                  <span className="empty-detail-icon" aria-hidden="true"><Icon name="current-location" /></span>
                   <h3>Selecciona un espacio</h3>
                   <p>Elige una sala o servicio en el mapa o en los resultados.</p>
                 </div>
@@ -700,34 +919,18 @@ function App() {
 
             <section className="search-panel" aria-label="Buscar espacios">
               <label className="search-field">
-                <span className="search-icon" aria-hidden="true">⌕</span>
-                <span className="sr-only">Buscar por nombre, código, tipo o categoría</span>
-                <input
-                  type="search"
-                  placeholder="¿Qué espacio o categoría buscas?"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-                <kbd>↵</kbd>
-              </label>
-              <div className="search-filters">
-                <label className="filter-field">
-                  <span>Tipo de espacio</span>
-                  <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-                    <option>Todos</option>
-                    {spaceTypes.map((type) => <option key={type}>{type}</option>)}
-                  </select>
-                </label>
-                <label className="accessibility-filter">
+                Buscar una sala o categoría
+                <div className="search-input-box">
+                  <span className="search-icon" aria-hidden="true"><Icon name="search" /></span>
                   <input
-                    type="checkbox"
-                    checked={accessibleOnly}
-                    onChange={(event) => setAccessibleOnly(event.target.checked)}
+                    type="search"
+                    placeholder="Ej: B203, L-03-P02-B, Laboratorio"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value.toUpperCase())}
                   />
-                  <span className="checkmark" aria-hidden="true">✓</span>
-                  Accesible
-                </label>
-              </div>
+                  <kbd aria-hidden="true"><Icon name="corner-down-left" /></kbd>
+                </div>
+              </label>
             </section>
 
             <section className="results-card">
@@ -753,16 +956,15 @@ function App() {
                       <strong>{getSpaceLabel(space)}</strong>
                       <span>{space.type} · {floorLabel(space.floor)}</span>
                     </span>
-                    <span className="list-arrow" aria-hidden="true">›</span>
+                    <span className="list-arrow" aria-hidden="true"><Icon name="chevron-right" /></span>
                   </button>
                 )) : (
                   <div className="no-results">
-                    <span aria-hidden="true">⌕</span>
+                    <span aria-hidden="true"><Icon name="search" /></span>
                     <p>No encontramos espacios con esos filtros.</p>
                     <button type="button" onClick={() => {
                       setQuery('')
-                      setTypeFilter('Todos')
-                      setAccessibleOnly(false)
+                      resetFilters()
                     }}>Limpiar filtros</button>
                   </div>
                 )}
@@ -771,20 +973,35 @@ function App() {
 
             {!adminOpen && selectedSpace && (
               <button type="button" className="show-on-map" onClick={() => goToSpace(selectedSpace)}>
-                Ver {getSpaceLabel(selectedSpace)} en el mapa <span aria-hidden="true">↗</span>
+                Ver {getSpaceLabel(selectedSpace)} en el mapa <span aria-hidden="true"><Icon name="arrow-up-right" /></span>
               </button>
             )}
           </aside>
         </div>
 
         <footer className="page-footer">
-          <span className="footer-mark">i</span>
+          <span className="footer-mark" aria-hidden="true"><Icon name="info-circle" /></span>
           <p>
             Prototipo de portafolio con datos inventados. No representa una sede real ni
             muestra información institucional.
           </p>
         </footer>
       </main>
+      <FiltersPanel
+        open={filtersOpen}
+        triggerRef={filtersButtonRef}
+        showWalls={showWalls}
+        onToggleWalls={() => setShowWalls((value) => !value)}
+        showGrass={showGrass}
+        onToggleGrass={() => setShowGrass((value) => !value)}
+        activeKinds={activeKinds}
+        accessibleOnly={accessibleOnly}
+        resultCount={filteredSpaces.length}
+        onToggleKind={toggleKind}
+        onToggleAccessible={() => setAccessibleOnly((value) => !value)}
+        onReset={resetFilters}
+        onClose={closeFilters}
+      />
     </div>
   )
 }

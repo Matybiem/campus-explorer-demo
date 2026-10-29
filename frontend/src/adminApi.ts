@@ -63,7 +63,7 @@ export function setAdminFloorActive(floor: number, active: boolean) {
 
 export function updateAdminSlots(
   floor: number,
-  slots: Pick<AdminSlot, 'id' | 'name' | 'type' | 'category' | 'enabled' | 'useContour' | 'accessible' | 'description'>[],
+  slots: Pick<AdminSlot, 'id' | 'name' | 'type' | 'category' | 'enabled' | 'useContour' | 'accessible' | 'description' | 'customCode'>[],
 ) {
   return request<{ slots: AdminSlot[] }>(`/api/admin/floors/${floor}/slots`, {
     method: 'PATCH',

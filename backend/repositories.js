@@ -13,7 +13,7 @@ function floorPlansFromRows(rows) {
 
 async function listSlots(client, floor) {
   const result = await client.query(
-    `SELECT id, name, type, category, floor, x, y, enabled, use_contour AS "useContour", accessible, description
+    `SELECT id, name, type, category, floor, x, y, enabled, use_contour AS "useContour", accessible, description, custom_code AS "customCode"
      FROM space_slots
      WHERE floor = $1
      ORDER BY y, x`,
@@ -155,14 +155,14 @@ export function createRepositories(pool) {
 
     async listPublic({ q, type, floor, accessible }) {
       const result = await pool.query(
-        `SELECT id, name, type, category, floor, x, y, capacity, accessible, description
+        `SELECT id, name, type, category, floor, x, y, capacity, accessible, description, custom_code AS "customCode"
          FROM space_slots
          WHERE enabled = TRUE
            AND EXISTS (
              SELECT 1 FROM floor_plans
              WHERE floor_plans.floor = space_slots.floor AND floor_plans.enabled = TRUE
            )
-           AND ($1 = '' OR POSITION(LOWER($1) IN LOWER(id || ' ' || name || ' ' || type || ' ' || COALESCE(category, ''))) > 0)
+           AND ($1 = '' OR POSITION(LOWER($1) IN LOWER(id || ' ' || name || ' ' || type || ' ' || COALESCE(category, '') || ' ' || COALESCE(custom_code, ''))) > 0)
            AND ($2::text IS NULL OR type = $2)
            AND ($3::integer IS NULL OR floor = $3)
            AND ($4::boolean IS NULL OR accessible = $4)
@@ -176,13 +176,13 @@ export function createRepositories(pool) {
       return listSlots(pool, floor)
     },
 
-    async updateSlot(id, { name, type, category, enabled, useContour, accessible, description }) {
+    async updateSlot(id, { name, type, category, enabled, useContour, accessible, description, customCode }) {
       const result = await pool.query(
         `UPDATE space_slots
-         SET name = $2, type = $3, category = $4, enabled = $5, use_contour = $6, accessible = $7, description = $8
+         SET name = $2, type = $3, category = $4, enabled = $5, use_contour = $6, accessible = $7, description = $8, custom_code = $9
          WHERE id = $1
-         RETURNING id, name, type, category, floor, x, y, enabled, use_contour AS "useContour", accessible, description`,
-        [id, name, type, category, enabled, useContour, accessible, description],
+         RETURNING id, name, type, category, floor, x, y, enabled, use_contour AS "useContour", accessible, description, custom_code AS "customCode"`,
+        [id, name, type, category, enabled, useContour, accessible, description, customCode ?? null],
       )
       return result.rows[0] ?? null
     },
@@ -217,7 +217,7 @@ export function createRepositories(pool) {
         for (const slot of updates) {
           await client.query(
             `UPDATE space_slots
-             SET name = $3, type = $4, category = $5, enabled = $6, use_contour = $7, accessible = $8, description = $9
+             SET name = $3, type = $4, category = $5, enabled = $6, use_contour = $7, accessible = $8, description = $9, custom_code = $10
              WHERE floor = $1 AND id = $2`,
             [
               floor,
@@ -229,6 +229,7 @@ export function createRepositories(pool) {
               slot.useContour,
               slot.accessible,
               slot.description,
+              slot.customCode ?? null,
             ],
           )
         }

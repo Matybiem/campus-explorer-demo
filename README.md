@@ -4,7 +4,7 @@ Aplicación de portafolio para explorar salas y servicios de un campus ficticio.
 
 ## Estado del proyecto
 
-Versión actual: **v1.1.0**. Para volver a este punto: `git checkout v1.1.0`. El trabajo posterior se desarrolla en ramas nuevas (`feature/...`) y las versiones se marcan con tags (`vMAYOR.MENOR.PARCHE`).
+Versión actual: **v1.2.0**. Para volver a una versión anterior: `git checkout v1.1.0`. El trabajo posterior se desarrolla en ramas nuevas (`feature/...`) y las versiones se marcan con tags (`vMAYOR.MENOR.PARCHE`): se sube el número menor con funcionalidades nuevas y el parche con correcciones.
 
 La rama `feature/fixed-floor-matrix-contour` incluye el plano interactivo con matriz fija de 15 × 15, el panel de administración y la API. Para probarla:
 
@@ -31,6 +31,69 @@ git switch --track origin/feature/fixed-floor-matrix-contour
 - npm
 - Git
 - Docker Desktop con Docker Compose, para la base de datos local
+
+---
+
+## Etapa 1: Preparar el repositorio local y crear Pull Request
+
+Sigue estos pasos antes de desplegar en TrueNAS. Todo el desarrollo se hace en ramas de feature y se integra mediante pull requests.
+
+### 1.1 Clonar el repositorio y crear una rama de feature
+
+```powershell
+git clone https://github.com/Matybiem/campus-explorer-demo.git
+cd campus-explorer-demo
+git checkout -b feature/tu-nombre-de-funcionalidad
+```
+
+### 1.2 Hacer los cambios en el código
+
+Modifica los archivos necesarios (frontend, backend, configuración Docker, documentación, etc.).
+
+### 1.3 Verificar que todo funcione localmente
+
+```powershell
+# Backend: pruebas
+npm test --prefix backend
+
+# Frontend: build y typecheck
+npm run build --prefix frontend
+```
+
+### 1.4 Commit y push de la rama
+
+```powershell
+git add .
+git commit -m "feat: descripción breve del cambio"
+git push origin feature/tu-nombre-de-funcionalidad
+```
+
+### 1.5 Crear el Pull Request en GitHub
+
+1. Ve a https://github.com/Matybiem/campus-explorer-demo
+2. Haz clic en **"Compare & pull request"** (aparece automáticamente después del push)
+3. Selecciona:
+   - **base:** `main`
+   - **compare:** `feature/tu-nombre-de-funcionalidad`
+4. Agrega título y descripción del PR
+5. Haz clic en **"Create pull request"**
+
+### 1.6 Revisión y merge del PR
+
+1. Un revisor aprueba los cambios
+2. Se resuelven comentarios si los hay
+3. Se hace **"Merge pull request"** → **"Merge commit"**
+4. La rama se puede eliminar después del merge
+
+### 1.7 Sincronizar tu rama local con main
+
+```powershell
+git checkout main
+git pull origin main
+git branch -d feature/tu-nombre-de-funcionalidad
+```
+
+---
 
 ## Puesta en marcha local
 
@@ -96,6 +159,10 @@ backend/
 frontend/
   src/App.tsx            Interfaz, búsqueda, filtros y selección
   src/AdminPanel.tsx     Inicio de sesión y edición de casillas
+  src/FiltersPanel.tsx   Panel lateral con la botonera de filtros
+  src/SpaceCategoryPicker.tsx  Desplegable de categorías de espacios comunes
+  src/SpaceIcon.tsx      Icono de cada tipo y categoría de espacio
+  src/icons.tsx          Iconos SVG de Tabler Icons usados en la interfaz
   src/api.ts             Cliente y validación de respuestas API
   src/adminApi.ts        Cliente de endpoints protegidos
   src/types.ts           Tipos del frontend
@@ -105,14 +172,17 @@ frontend/
 
 ## Funcionalidades
 
-- Búsqueda por nombre, código o tipo de espacio.
-- Filtros por categoría y accesibilidad.
+- Búsqueda por nombre, código o tipo de espacio (incluye códigos asociados como `S-05-P04-A`).
+- Códigos de sala/laboratorio con formato estándar: `[Tipo]-[Número]-[Piso]-[Ala]` (ej: `S-05-P04-A`, `L-03-S02-B` para sótanos con guion).
+- Tipo de espacio 'Otro' con icono de usuarios en celeste (#24EAFF).
+- Filtros por tipo, categoría y accesibilidad desde un panel lateral con botonera («Filtros»).
 - Selección de piso y espacios en el plano o en la lista.
 - Panel con detalles ficticios del espacio seleccionado.
 - Plano interactivo editable como matriz fija de 15 × 15 casillas por nivel; el contorno configurable define la superficie visible del piso sin mostrar casillas ocultas como salas.
-- Controles de rotación, inclinación y zoom (20 % a 140 %); la vista inicial es inclinada y la opción «Vista plana» cambia a una vista superior. Con el clic derecho sostenido sobre el mapa se desplaza el plano («mano»).
-- Botón «Ver todos los pisos»: muestra todos los niveles activos apilados como planos de 15 × 15 alineados sobre el eje Z, con el piso más alto arriba; el piso seleccionado queda separado del que tiene encima.
-- En modo administración, mantener presionado el clic izquierdo sobre una casilla (0,4 s) y soltarla sobre otra intercambia sus datos como un cambio pendiente.
+- Paredes 3D sobre los contornos activos de cada piso, tanto en la vista de un solo piso como en «Ver todos los pisos»: se levantan en el borde de la superficie visible, con una altura igual al ancho de una casilla (`wallHeight` en `frontend/src/App.tsx`), son translúcidas para no ocultar las salas y no interceptan clics.
+- Controles de rotación, inclinación y zoom (20 % a 140 %); la rueda del ratón sobre el mapa cambia el zoom (hacia arriba acerca, hacia abajo aleja) en lugar de desplazarlo. La vista inicial es inclinada y la opción «Vista plana» cambia a una vista superior. Con el clic izquierdo sostenido y movido sobre el mapa (más de 5 px) se orbita: el movimiento horizontal cambia la rotación y el vertical la inclinación (arrastrar hacia arriba inclina más). Un clic sin movimiento sigue seleccionando la sala. Con el clic derecho sostenido se desplaza el plano («mano»).
+- Botón «Ver todos los pisos»: muestra todos los niveles activos apilados como planos de 15 × 15 alineados sobre el eje Z, con el piso más alto arriba. La separación entre pisos es igual a la altura de las paredes, de modo que cada pared llega justo al piso de arriba; el piso seleccionado queda separado del que tiene encima.
+- En modo administración, mantener presionado el clic izquierdo sobre una casilla sin moverse durante 0,4 s y soltarla sobre otra intercambia sus datos como un cambio pendiente; si el cursor se mueve antes de ese tiempo, el gesto gira el mapa.
 - Panel admin protegido junto al mapa para activar u ocultar casillas y editar el nombre y tipo de cada espacio; el nombre puede quedar vacío y en ese caso se muestra el código de la casilla. En modo administración se muestran todas las casillas y las ocultas aparecen en gris.
 - En modo administración se pueden editar las 225 casillas del nivel, incluidas las ocultas, y definir cuáles ocultas forman parte del contorno del piso. Las casillas visibles siempre forman parte del contorno.
 - El perfil de administrador puede agregar y desactivar niveles en orden: hasta 10 pisos y 5 subterráneos. Solo se desactiva el último nivel de cada secuencia, el Piso 1 permanece activo y las salas se conservan al desactivar un nivel.
@@ -120,6 +190,134 @@ frontend/
 - API REST con Node.js y Express.
 
 El plano actual es un esquema CSS interactivo, no un modelo arquitectónico ni un visor 3D.
+
+## Requerimientos funcionales
+
+Cada requerimiento describe qué puede hacer la aplicación y las reglas que cumple. Los valores configurables se indican con el nombre de su constante en `frontend/src/App.tsx`.
+
+### RF-01 Consulta del mapa por piso
+
+El mapa muestra los espacios de un piso sobre una cuadrícula fija, con la superficie del piso y sus paredes.
+
+- **Cuadrícula fija:** cada piso es una matriz de 15 × 15 casillas. Solo las casillas visibles se muestran como salas.
+- **Contorno:** la superficie del piso se dibuja con las casillas visibles y con las ocultas marcadas con «Usar contorno».
+- **Paredes:** se levantan en cada borde exterior del contorno, con una altura igual al ancho de una casilla (`wallHeight`). Son translúcidas, así que las salas se siguen viendo, y no interceptan los clics. El botón «Paredes» del panel de filtros las muestra u oculta, tanto en la vista de un piso como en la de todos los pisos; empiezan visibles.
+- **Pasto:** en el Piso 1 (el nivel de calle) las casillas de la matriz que no pertenecen al contorno activo se cubren con una capa verde translúcida, igual que las paredes, para diferenciarlo de los subterráneos. El botón «Pasto» del panel de filtros lo muestra u oculta; empieza visible. No aparece en ningún otro nivel, y en la vista de todos los pisos solo se dibuja sobre el Piso 1.
+- **Selector de nivel:** lista solo los niveles activos, de arriba hacia abajo: Piso 4, Piso 3, Piso 2, Piso 1, Subterráneo 1, Subterráneo 2.
+- **Selección:** un clic sobre una sala la resalta y muestra su detalle.
+- **Tipos y categorías:** cada tipo de espacio y cada categoría de espacio común tiene su propio color e icono. Todos los iconos de la interfaz son de Tabler Icons, en estilo de contorno. El tipo 'Otro' usa el icono de usuarios en celeste (#24EAFF). El tipo 'Sala' usa el icono de gafas.
+
+### RF-02 Navegación del mapa
+
+El usuario controla la cámara del mapa con el ratón o con los controles de la parte inferior.
+
+- **Rotación e inclinación:** los deslizadores rotan el plano entre -180° y 180° y lo inclinan entre 0° y 90°.
+- **Zoom:** el zoom queda entre 20 % y 140 % (`minZoom` y `maxZoom`). Se ajusta con el deslizador, con los botones + y − (10 puntos por pulsación) y con la rueda del ratón sobre el mapa (5 puntos por «clic», con `wheelZoomPerPixel`).
+- **Rueda del ratón:** la rueda sobre el mapa cambia el zoom en lugar de desplazarlo. Fuera del mapa, la página se desplaza como siempre.
+- **Orbitar:** al mantener el clic izquierdo y mover el ratón más de 5 px (`orbitThresholdPx`), el movimiento horizontal cambia la rotación y el vertical la inclinación (hacia arriba inclina más). Un clic sin movimiento selecciona la sala.
+- **Mover el mapa:** con el clic derecho sostenido el plano se arrastra como una mano. También se puede mover con las barras de desplazamiento. Sobre el mapa no aparece el menú contextual del navegador.
+- **Vistas predefinidas:** «Restablecer vista» vuelve a la vista inclinada inicial (`defaultView`) y «Vista plana» muestra el mapa desde arriba (`flatView`).
+- **Margen:** el plano queda rodeado de un margen amplio (`mapCanvasPadding`) para poder moverlo sin que toque el borde.
+
+### RF-03 Vista de todos los pisos
+
+El botón «Ver todos los pisos» muestra todos los niveles activos apilados en el eje Z.
+
+- **Piso por defecto:** cada vez que se activa la vista, el piso seleccionado pasa a ser el más alto. Después se puede elegir otro piso desde el selector.
+- **Planos alineados:** cada piso es un plano de 15 × 15 con el mismo origen, así que la casilla (x, y) de un piso queda sobre la (x, y) del piso de abajo.
+- **Orden:** el piso más alto va arriba y cada plano lleva una etiqueta con su nombre.
+- **Separación:** la distancia entre pisos es igual a la altura de las paredes (`stackLayerGap`), de modo que cada pared llega justo al piso de arriba. El piso seleccionado queda más separado del que tiene encima (`stackSelectedGap`).
+- **Paredes:** cada piso dibuja las paredes de su propio contorno.
+- **Selección:** un clic sobre una sala la selecciona y cambia al piso al que pertenece.
+- **Controles:** la rotación, la inclinación y el zoom funcionan igual que en la vista de un piso.
+- **Administración:** el botón se oculta en modo administración, que siempre edita un solo piso.
+
+### RF-04 Búsqueda y filtros
+
+El usuario encuentra espacios por texto y con filtros, en todos los pisos a la vez.
+
+- **Búsqueda:** el campo de texto busca por nombre, código, código asociado (`customCode`), tipo o categoría, sin distinguir mayúsculas y minúsculas. Si el espacio no tiene código asociado guardado, se sugiere automáticamente desde el nombre y el piso.
+- **Alcance:** la búsqueda recorre todos los pisos, no solo el seleccionado.
+- **Filtros:** el botón «Filtros», a la derecha de «Ver todos los pisos», abre un panel lateral derecho con una botonera de once botones: Sala, Laboratorio, Administrativo, Baño hombre, Baño mujer, Escalera, Ascensor, Comida, Accesible, Paredes y Pasto. Los botones de tipo y categoría activos se ven a color (con el color e icono de cada uno) y los desactivados en gris. Al abrir el panel están todos activos, de modo que se muestran todos los espacios; al desactivar uno, sus espacios se ocultan. «Accesible» empieza desactivado y, al activarlo, solo se muestran los espacios accesibles. «Paredes» y «Pasto» no filtran espacios: son opciones de vista que muestran u ocultan las paredes y el pasto del mapa (empiezan activas); no cuentan en la insignia ni se restablecen con «Restablecer filtros».
+- **Panel de filtros:** Se cierra con el botón ✕, con la tecla Esc, al hacer clic fuera del panel o volviendo a pulsar «Filtros». No oscurece la página, así que el mapa y los resultados se actualizan mientras se eligen los filtros. Incluye el número de resultados y el botón «Restablecer filtros».
+- **Indicador:** el botón «Filtros» muestra una insignia con el número de filtros activos (tipos desactivados más «Accesible»); sin insignia, no hay ninguno.
+- **Resultados:** la lista muestra el icono, el nombre, el tipo y el nivel de cada espacio, junto con el número de resultados.
+- **Ir al espacio:** al elegir un resultado, el mapa cambia al piso del espacio y lo selecciona.
+- **Mapa:** las salas que no coinciden con la búsqueda se atenúan y no se pueden seleccionar.
+- **Sin resultados:** se muestra un aviso con el botón «Limpiar filtros», que borra el texto y restablece todos los filtros.
+
+### RF-05 Detalle de un espacio
+
+Al seleccionar un espacio, el panel lateral muestra su información.
+
+- **Encabezado:** una etiqueta con el tipo, con su icono y color (para un espacio común incluye la categoría), y el nombre del espacio. Si no tiene nombre, se muestra su código.
+- **Datos:** código, código asociado (si existe), piso y capacidad referencial (solo si existe).
+- **Accesibilidad:** indica «Accesible» o «No indicada».
+- **Descripción:** se muestra entre la accesibilidad y la nota de información ficticia.
+- **Ver en el mapa:** el botón «Ver … en el mapa» cambia al piso del espacio y lo selecciona.
+
+### RF-06 Acceso del administrador
+
+La edición del mapa requiere iniciar sesión como administrador.
+
+- **Inicio de sesión:** el botón «Administrar» abre el panel con usuario (hasta 40 caracteres) y contraseña (hasta 72).
+- **Sesión:** la sesión se guarda en una cookie `HttpOnly` y dura 8 horas. El botón «Salir» la cierra.
+- **Intentos:** se permiten 8 intentos de inicio de sesión cada 15 minutos.
+- **Contraseñas:** se guardan con hash bcrypt y nunca se envían al frontend.
+- **Rutas protegidas:** todas las rutas de edición exigen sesión. Sin ella responden con el estado `401`.
+- **Cerrar la administración:** los botones «Cerrar administración» y «Salir» se bloquean mientras haya cambios sin guardar.
+
+### RF-07 Edición de casillas
+
+El administrador edita cualquiera de las 225 casillas del piso, incluidas las ocultas.
+
+- **Mapa de edición:** muestra todas las casillas del piso. Las ocultas aparecen en gris.
+- **Visibilidad:** el interruptor «Visible» o «Oculta» decide si la casilla se muestra como sala en el mapa público.
+- **Tipo:** se elige primero el tipo: Sala, Laboratorio, Administrativo o Espacio común.
+- **Nombre:** es opcional y admite hasta 60 caracteres. Si queda vacío, se muestra el código de la casilla.
+- **Categoría:** para un Espacio común, el nombre se reemplaza por una categoría obligatoria: Baño hombre, Baño mujer, Escalera, Ascensor o Comida. Cada una se elige en un desplegable con su icono y color.
+- **Código de sala:** para Sala y Laboratorio, aparece un campo «Código de sala» que sugiere automáticamente un código con formato `[Tipo]-[Número]-[Piso]-[Ala]` (ej: `S-05-P04-A`). El administrador puede editarlo manualmente o dejarlo vacío para usar el sugerido.
+- **Accesibilidad:** la casilla «Espacio accesible» marca si el espacio es accesible.
+- **Usar contorno:** decide si una casilla oculta forma parte de la superficie del piso. Mientras la casilla es visible, esta opción queda marcada y no se puede desmarcar. Se conserva al ocultarla.
+- **Descripción:** texto opcional de hasta 500 caracteres.
+
+### RF-08 Guardado de cambios
+
+Los cambios se acumulan y se guardan todos juntos.
+
+- **Cambios pendientes:** cada edición queda pendiente. El botón «Guardar cambios (N)» muestra cuántas casillas se modificaron.
+- **Guardado conjunto:** el botón guarda todas las casillas modificadas del piso en una sola petición, hasta 225.
+- **Consistencia:** el guardado es una transacción. Si algo falla, no se guarda ninguna casilla.
+- **Bloqueo:** con cambios pendientes no se puede cambiar de piso, cerrar la administración ni modificar los niveles.
+- **Confirmación:** al terminar se informa cuántos cambios se guardaron.
+
+### RF-09 Gestión de niveles
+
+El administrador agrega y desactiva pisos y subterráneos.
+
+- **Límites:** hasta 10 pisos y 5 subterráneos. Los contadores muestran cuántos hay activos.
+- **Orden:** los botones «＋ Piso» y «＋ Subterráneo» activan el siguiente nivel de su secuencia, sin dejar huecos.
+- **Desactivar:** el botón «−» desactiva solo el último nivel de cada secuencia. El Piso 1 no se puede desactivar.
+- **Datos conservados:** un nivel desactivado desaparece del selector y del mapa público, pero conserva sus casillas para poder reactivarlo.
+- **Bloqueo:** los botones se deshabilitan mientras hay cambios pendientes.
+
+### RF-10 Intercambio de casillas
+
+El administrador reubica el contenido de una casilla arrastrándola.
+
+- **Gesto:** mantener presionado el clic izquierdo sobre una casilla sin moverse durante 0,4 s (`slotDragDelayMs`) y soltarla sobre otra.
+- **Resultado:** las dos casillas intercambian su contenido (visibilidad, tipo, nombre, categoría, accesibilidad, contorno y descripción). Sus posiciones no cambian.
+- **Pendiente:** el intercambio queda como un cambio pendiente y se guarda con el resto.
+- **Orbitar:** si el cursor se mueve antes de los 0,4 s, el gesto gira el mapa en lugar de intercambiar.
+- **Resaltado:** la casilla de origen se atenúa y la de destino se resalta mientras se arrastra.
+
+### RF-11 Estado de la conexión
+
+La aplicación informa cuando carga los datos o cuando falla la conexión.
+
+- **Carga:** mientras se piden los espacios se muestra el mensaje «Cargando espacios de demostración…».
+- **Error:** si la API no responde o devuelve un formato inválido, se muestra el motivo y un botón «Reintentar».
+- **Datos reales:** la aplicación no muestra datos inventados como si la API hubiera respondido.
 
 ## Arquitectura y flujo de datos
 
@@ -134,7 +332,7 @@ Los niveles y casillas se almacenan en PostgreSQL. Los pisos usan los números 1
 | --- | --- | --- |
 | `id` | texto | Identificador único del espacio |
 | `name` | texto | Nombre que se muestra |
-| `type` | `Sala`, `Laboratorio`, `Administrativo` o `Espacio común` | Tipo principal |
+| `type` | `Sala`, `Laboratorio`, `Administrativo`, `Espacio común` o `Otro` | Tipo principal |
 | `category` | `Baño hombre`, `Baño mujer`, `Escalera`, `Ascensor` o `Comida`; nulo para otros tipos | Subcategoría de un espacio común, con su icono y color |
 | `floor` | número entero | Piso |
 | `x`, `y` | número entero entre 0 y 14 | Columna y fila en la matriz fija de 15 × 15 |
@@ -143,6 +341,7 @@ Los niveles y casillas se almacenan en PostgreSQL. Los pisos usan los números 1
 | `capacity` | número, opcional | Capacidad referencial ficticia |
 | `accessible` | booleano | Indica accesibilidad en los datos de ejemplo |
 | `description` | texto | Descripción del espacio |
+| `custom_code` | texto, opcional | Código asociado personalizado para Sala o Laboratorio (formato: `S-05-P04-A`) |
 
 La interfaz de administración permite seleccionar primero el tipo principal y luego editar el nombre; para «Espacio común», el nombre se reemplaza por una categoría seleccionable (baño hombre, baño mujer, escalera, ascensor o comida). Cada categoría tiene su propio icono y color. Los cambios de nombre, tipo, categoría, visibilidad, accesibilidad y descripción quedan pendientes hasta guardar juntos todos los cambios del piso. Las descripciones admiten hasta 500 caracteres y se muestran en los detalles públicos debajo de la accesibilidad. No permite cerrar la administración ni cambiar de piso hasta guardar los cambios. Las casillas desactivadas no aparecen en el mapa público. Si cambia el contrato, actualiza PostgreSQL, los repositorios, `frontend/src/types.ts`, la validación API y las pruebas afectadas.
 
@@ -165,7 +364,7 @@ En administración, las casillas visibles siempre pertenecen a la superficie del
 - `PATCH /api/admin/floors/:floor/active`: agrega o desactiva un piso/subterráneo siguiendo el orden y los límites establecidos; requiere sesión admin.
 - `PATCH /api/admin/slots/:id`: guarda una casilla individual; `name` es opcional y admite hasta 60 caracteres; requiere sesión admin.
 
-Los tipos principales admitidos son `Sala`, `Laboratorio`, `Administrativo` y `Espacio común`. Los espacios comunes requieren una categoría de `Baño hombre`, `Baño mujer`, `Escalera`, `Ascensor` o `Comida`; los tipos de baño independientes ya no se aceptan. La migración convierte los tipos de baño existentes en espacios comunes y conserva su categoría. Los filtros inválidos devuelven estado HTTP `400` con un mensaje JSON. Las rutas de edición requieren sesión y las contraseñas no se envían al frontend después del login.
+Los tipos principales admitidos son `Sala`, `Laboratorio`, `Administrativo`, `Espacio común` y `Otro`. Los espacios comunes requieren una categoría de `Baño hombre`, `Baño mujer`, `Escalera`, `Ascensor` o `Comida`; los tipos de baño independientes ya no se aceptan. La migración convierte los tipos de baño existentes en espacios comunes y conserva su categoría. Los filtros inválidos devuelven estado HTTP `400` con un mensaje JSON. Las rutas de edición requieren sesión y las contraseñas no se envían al frontend después del login. Para `Sala` y `Laboratorio`, el campo `custom_code` permite guardar un código asociado personalizado; si está vacío, se genera automáticamente desde el nombre y el piso.
 
 ## Pruebas y compilación
 
@@ -220,6 +419,34 @@ test(backend): cover invalid space filters
 ```
 
 Tipos habituales: `feat`, `fix`, `docs`, `test` y `refactor`.
+
+## Créditos y licencias
+
+Los iconos de la interfaz provienen de [Tabler Icons](https://tabler.io/icons). Solo se copian los SVG necesarios en `frontend/src/icons.tsx`, sin instalar el paquete. Para agregar un icono, copia sus trazados desde Tabler (estilo `outline`) a ese archivo.
+
+```text
+MIT License
+
+Copyright (c) 2020-2026 Paweł Kuna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## Privacidad y alcance de la demo
 

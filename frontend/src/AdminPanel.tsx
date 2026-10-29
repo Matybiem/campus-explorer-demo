@@ -8,6 +8,7 @@ import {
   updateAdminSlots,
 } from './adminApi'
 import { fetchFloorPlan } from './api'
+import { Icon } from './icons'
 import SpaceCategoryPicker from './SpaceCategoryPicker'
 import { floorLabel, type AdminSlot, type FloorPlan, type SpaceCategory } from './types'
 
@@ -134,7 +135,7 @@ function AdminPanel({
 
   function updateDraft(
     id: string,
-    changes: Partial<Pick<AdminSlot, 'name' | 'type' | 'category' | 'enabled' | 'useContour' | 'accessible' | 'description'>>,
+    changes: Partial<Pick<AdminSlot, 'name' | 'type' | 'category' | 'enabled' | 'useContour' | 'accessible' | 'description' | 'customCode'>>,
   ) {
     const updated = slots.map((slot) => slot.id === id ? { ...slot, ...changes } : slot)
     setSlots(updated)
@@ -151,6 +152,7 @@ function AdminPanel({
       useContour: slot.useContour,
       accessible: slot.accessible,
       description: slot.description,
+      customCode: slot.customCode,
     }
   }
 
@@ -187,7 +189,8 @@ function AdminPanel({
       slot.enabled !== savedSlot.enabled ||
       slot.useContour !== savedSlot.useContour ||
       slot.accessible !== savedSlot.accessible ||
-      slot.description !== savedSlot.description
+      slot.description !== savedSlot.description ||
+      slot.customCode !== savedSlot.customCode
   })
 
   useEffect(() => {
@@ -210,6 +213,7 @@ function AdminPanel({
         useContour: slot.useContour,
         accessible: slot.accessible,
         description: slot.description,
+        customCode: slot.customCode,
       })))
       setSlots(result.slots)
       setSavedSlots(result.slots)
@@ -227,6 +231,21 @@ function AdminPanel({
     }
   }
 
+
+  /** Genera un código sugerido a partir del nombre de la sala/laboratorio y el piso.
+   *  Formato: [S|L]-[2 dígitos finales]-P[2 dígitos piso]-[Ala]
+   *  Ejemplo: nombre "A405", piso 4, tipo Sala → S-05-P04-A
+   */
+  function suggestCode(name: string, floor: number, type: 'Sala' | 'Laboratorio'): string {
+    const prefix = type === 'Laboratorio' ? 'L' : 'S'
+    const match = name.trim().match(/^([A-Za-z])(\d{3})/)
+    if (!match) return ''
+    const wing = match[1].toUpperCase()
+    const roomDigits = match[2].slice(1)
+    const hasDash = name.includes('-')
+    const floorStr = floor < 0 && hasDash ? `S${String(Math.abs(floor)).padStart(2, '0')}` : `P${String(floor < 0 ? Math.abs(floor) : floor).padStart(2, '0')}`
+    return `${prefix}-${roomDigits}-${floorStr}-${wing}`
+  }
   const selectedSlot = slots.find((slot) => slot.id === selectedSlotId)
 
   return (
@@ -256,12 +275,18 @@ function AdminPanel({
 
       {!loading && !authenticated && (
         <form className="admin-login-card" onSubmit={handleLogin}>
-          <div className="admin-lock-icon" aria-hidden="true">⌑</div>
+          <div className="admin-lock-icon" aria-hidden="true"><Icon name="lock" /></div>
           <h3>Acceso de administrador</h3>
           <p>Inicia sesión para editar la configuración del plano.</p>
           <label>
             Usuario
-            <input name="username" autoComplete="username" required maxLength={40} />
+            <input
+              name="username"
+              autoComplete="username"
+              placeholder="Ej. admin"
+              required
+              maxLength={40}
+            />
           </label>
           <label>
             Contraseña
@@ -269,6 +294,7 @@ function AdminPanel({
               name="password"
               type="password"
               autoComplete="current-password"
+              placeholder="••••••••"
               required
               maxLength={72}
             />
@@ -355,6 +381,24 @@ function AdminPanel({
                   />
                 </label>
               )}
+              {(selectedSlot.type === 'Sala' || selectedSlot.type === 'Laboratorio') && (
+                <label className="admin-field">
+                  Código de sala
+                  <input
+                    value={selectedSlot.customCode ?? ''}
+                    disabled={busy}
+                    onChange={(event) => updateDraft(selectedSlot.id, { customCode: event.target.value })}
+                    onFocus={() => {
+                      if (!selectedSlot.customCode) {
+                        const suggested = suggestCode(selectedSlot.name, selectedSlot.floor, selectedSlot.type as 'Sala' | 'Laboratorio')
+                        if (suggested) updateDraft(selectedSlot.id, { customCode: suggested })
+                      }
+                    }}
+                    placeholder={suggestCode(selectedSlot.name, selectedSlot.floor, selectedSlot.type as 'Sala' | 'Laboratorio') || 'Ej: S-05-P04-A'}
+                    maxLength={20}
+                  />
+                </label>
+              )}
               <div className="admin-slot-options">
                 <label className="admin-accessibility-toggle">
                   <input
@@ -390,7 +434,7 @@ function AdminPanel({
             </article>
           ) : (
             <div className="empty-detail">
-              <span className="empty-detail-icon" aria-hidden="true">⌖</span>
+              <span className="empty-detail-icon" aria-hidden="true"><Icon name="current-location" /></span>
               <h3>Selecciona una casilla</h3>
               <p>Elige cualquier recuadro del mapa, incluso los que están ocultos.</p>
             </div>
